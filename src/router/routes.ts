@@ -7,6 +7,11 @@ const routes: RouteRecordRaw[] = [
     children: [{path: '', component: () => import('pages/IndexPage.vue')}],
   },
   {
+    path: '/typhoon',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [{path: '', component: () => import('pages/Typhoon.vue')}],
+  },
+  {
     path: '/precip',
     component: () => import('layouts/MainLayout.vue'),
     children: [

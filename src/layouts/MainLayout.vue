@@ -19,7 +19,7 @@
             <q-item v-ripple :active="i.href === selectedNavItem" :to="i.href"
                     clickable>
               <q-item-section avatar>
-                <q-icon :name="'svguse:nav-icons/icons.svg#' + i.icon"/>
+                <q-icon :name="i.icon"/>
               </q-item-section>
               <q-item-section>
                 {{ i.name }}
@@ -51,6 +51,7 @@
 import {computed, defineComponent, onMounted, ref} from 'vue';
 import sdk from 'src/composables/sdk';
 import {useRoute} from 'vue-router';
+import {mdiWeatherHurricane} from '@quasar/extras/mdi-v7';
 
 export default defineComponent({
   name: 'MainLayout',
@@ -76,6 +77,7 @@ export default defineComponent({
     })
 
     return {
+      hurricane: mdiWeatherHurricane,
       navigationList,
       selectedNavItem,
       leftDrawerOpen,

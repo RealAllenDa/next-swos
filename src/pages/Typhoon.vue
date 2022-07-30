@@ -1,13 +1,13 @@
 <template>
   <q-page class="column items-stretch">
-    Nowcast
+    Typhoon
   </q-page>
 </template>
 
-<script lang="ts">
+<script>
 import {defineComponent} from 'vue';
 
 export default defineComponent({
-  name: 'PrecipitationNowcast',
+  name: 'TyphoonPage'
 });
 </script>
