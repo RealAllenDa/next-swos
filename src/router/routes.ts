@@ -4,12 +4,12 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: () => import('layouts/MainLayout.vue'),
-    children: [{path: '', component: () => import('pages/IndexPage.vue')}],
+    children: [{path: '', component: () => import('pages/IndexPage.vue')}]
   },
   {
     path: '/typhoon',
     component: () => import('layouts/MainLayout.vue'),
-    children: [{path: '', component: () => import('pages/Typhoon.vue')}],
+    children: [{path: '', component: () => import('pages/TyphoonPage.vue')}],
   },
   {
     path: '/precip',
@@ -22,6 +22,16 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'forecast',
         component: () => import('pages/PrecipitationForecast.vue')
+      },
+    ]
+  },
+  {
+    path: '/warning',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [
+      {
+        path: 'weather',
+        component: () => import('pages/WeatherWarning.vue')
       },
     ]
   },

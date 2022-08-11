@@ -8,6 +8,12 @@
         <q-toolbar-title>
           SWoS - {{ currentTitle }}
         </q-toolbar-title>
+
+        <marquee-text
+          class="q-ml-xl"
+          style="max-width: 600px;">
+          Testetete
+        </marquee-text>
       </q-toolbar>
     </q-header>
 
@@ -51,10 +57,14 @@
 import {computed, defineComponent, onMounted, ref} from 'vue';
 import sdk from 'src/composables/sdk';
 import {useRoute} from 'vue-router';
-import {mdiWeatherHurricane} from '@quasar/extras/mdi-v7';
+import MarqueeText from 'vue-marquee-text-component';
 
 export default defineComponent({
   name: 'MainLayout',
+
+  components: {
+    MarqueeText
+  },
 
   setup() {
     const route = useRoute()
@@ -64,6 +74,9 @@ export default defineComponent({
       return route.path;
     })
     const currentTitle = computed(() => {
+      if (selectedNavItem.value === '/') {
+        return 'Home';
+      }
       if (navigationList.value === undefined || navigationList.value === null) {
         return '';
       }
@@ -77,7 +90,6 @@ export default defineComponent({
     })
 
     return {
-      hurricane: mdiWeatherHurricane,
       navigationList,
       selectedNavItem,
       leftDrawerOpen,

@@ -15,9 +15,17 @@ declare interface ChooseOptions {
   value: string;
 }
 
+declare interface LegendOptions {
+  title: string;
+  unit: string;
+  levels: string[];
+}
+
 declare interface MapInterface {
   data_id: string;
   resolution: ChooseOptions[];
+  legends: LegendOptions;
+  torrential_avail: boolean;
 }
 
 declare interface MapSpec {

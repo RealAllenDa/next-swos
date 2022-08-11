@@ -91,7 +91,7 @@
         Play (Ctrl+Enter)
       </q-tooltip>
     </q-btn>
-    <q-btn class="q-mr-xl"
+    <q-btn class="q-mr-lg"
            color="primary"
            icon="speed"
            outline>
@@ -115,11 +115,23 @@
         </q-list>
       </q-menu>
     </q-btn>
+    <q-btn :disable="!torrentialRainAvailable"
+           :outline="!displayTorrentialRain"
+           class="q-mr-xl"
+           color="primary"
+           icon="fa-solid fa-cloud-showers-heavy"
+           @click="displayTorrentialRain = !displayTorrentialRain">
+      <q-tooltip :offset="[0, 20]" anchor="top middle"
+                 class="text-bold" self="center middle"
+                 transition-duration="0">
+        Localized Torrential Rain
+      </q-tooltip>
+    </q-btn>
   </q-toolbar>
 </template>
 
 <script lang="ts">
-import {computed, defineComponent, onBeforeUnmount, onMounted, ref, Ref, watch} from 'vue';
+import {computed, defineComponent, onBeforeUnmount, onMounted, onUnmounted, ref, Ref, watch} from 'vue';
 import {usePrecipitationStore} from 'stores/precipitation';
 import {setInterval} from 'timers';
 
@@ -146,7 +158,6 @@ export default defineComponent({
       } else if (e.shiftKey && e.key === 'Enter') {
         emit('refresh')
       }
-      console.log(e.key, e.ctrlKey, e.shiftKey);
     }
 
     onMounted(() => {
@@ -215,19 +226,6 @@ export default defineComponent({
       } else {
         return ' ';
       }
-      // } else if (latestTime.value - time === 3600 * 2) {
-      //   return '-2 h';
-      // } else if (latestTime.value - time === 3600 * 3) {
-      //   return '-3 h';
-      // } else if (latestTime.value - time === 3600 * 4) {
-      //   return '-4 h';
-      // } else if (latestTime.value - time === 3600 * 5) {
-      //   return '-5 h';
-      // } else if (latestTime.value - time === 3600 * 6) {
-      //   return '-6 h';
-      // } else if (latestTime.value - time === 0) {
-      //   // Current
-      // } else {
     }
 
     // Playback
@@ -284,6 +282,21 @@ export default defineComponent({
       }
     });
 
+    onUnmounted(() => {
+      endPlayback()
+    })
+
+    // Torrential Rain
+    const displayTorrentialRain = computed({
+      get() {
+        return precipitationStore.displayTorrentialRain
+      },
+      set() {
+        precipitationStore.displayTorrentialRain = !precipitationStore.displayTorrentialRain
+      }
+    });
+    const torrentialRainAvailable = computed(() => precipitationStore.torrentialRainAvailable)
+
     return {
       // Resolution
       resolutionOptions,
@@ -308,7 +321,11 @@ export default defineComponent({
       playbackSpeedList,
       isInPlayback,
       startPlayback,
-      endPlayback
+      endPlayback,
+
+      // Torrential Rain
+      displayTorrentialRain,
+      torrentialRainAvailable
     };
   }
 });

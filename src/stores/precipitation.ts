@@ -1,4 +1,5 @@
 import {defineStore} from 'pinia';
+import sdk from 'src/composables/sdk';
 
 export const usePrecipitationStore = defineStore('precipitation', {
   state: () => ({
@@ -11,9 +12,13 @@ export const usePrecipitationStore = defineStore('precipitation', {
 
     spec: undefined as Nullable<MapSpec>,
     list: undefined as Nullable<PrecipitationAnalysisList>,
-    currentList: [] as { [time: number]: PrecipitationAnalysisFile },
+    currentList: {} as { [time: number]: PrecipitationAnalysisFile },
     currentData: undefined as Nullable<PrecipitationAnalysisFile>,
 
+    displayTorrentialRain: false,
+    torrentialRainAvailable: false,
+
+    legendOptions: undefined as LegendOptions | undefined,
     mapOptions: {} as { [name: string]: MapInterface },
     timeOptions: [
       {label: '1H', value: '1h'},
@@ -37,7 +42,8 @@ export const usePrecipitationStore = defineStore('precipitation', {
     },
     setSpec(spec: Nullable<MapSpec>) {
       if (spec === undefined || spec === null) {
-        throw new Error('Unexpected null spec!');
+        sdk.showNotification('negative', 'Unexpected null spec!');
+        return
       }
       this.spec = spec;
       this.timeOptions = this.spec.durations;
@@ -45,13 +51,27 @@ export const usePrecipitationStore = defineStore('precipitation', {
       this.selectedDuration = this.spec.default.duration;
       this.mapOptions = this.spec.maps;
     },
+    setOptions(resolution: string | undefined, duration: string | undefined, torrential: boolean | undefined) {
+      console.log(resolution, duration, torrential)
+      if (resolution !== undefined) {
+        this.selectedResolution = resolution;
+      }
+      if (duration !== undefined) {
+        this.selectedDuration = duration;
+      }
+      if (torrential !== undefined) {
+        this.displayTorrentialRain = torrential;
+      }
+    },
 
     initDataList(mutationType: string) {
       if (this.list === undefined || this.list === null) {
-        throw new Error('List is null!');
+        sdk.showNotification('negative', 'List is null!');
+        return
       }
       if (this.spec === undefined || this.spec === null) {
-        throw new Error('Spec has not been loaded!');
+        sdk.showNotification('negative', 'Spec has not been loaded!');
+        return;
       }
       if (this.mapOptions[this.mapId] === undefined) {
         // When something is changed, we knew that the changed parameter
@@ -63,29 +83,34 @@ export const usePrecipitationStore = defineStore('precipitation', {
         } else if (mutationType === 'initialize' || mutationType === 'refresh') {
           // Do nothing.
         } else {
-          throw new Error(`Exhaustive handling of mutationTypes: ${mutationType}`);
+          sdk.showNotification('negative', `Exhaustive handling of mutationTypes: ${mutationType}`);
+          return;
         }
       }
 
+      this.initLegends();
       this.initResolution();
+      this.initTorrentialRain();
 
       const dataId = this.mapOptions[this.mapId].data_id;
       let data: Nullable<Array<PrecipitationAnalysisFile>> =
         this.list[dataId as keyof PrecipitationAnalysisList];
       if (data === undefined || data === null) {
-        throw new Error(`Shouldn\'t happen: data is null of dataId ${dataId}`);
+        sdk.showNotification('negative', `Shouldn\'t happen: data is null of dataId ${dataId}`);
+        return;
       }
 
       data = data.sort((a, b) => a.time - b.time);
       this.startTime = data[0].time;
       const endTime = data.at(-1);
       if (endTime === undefined || endTime === null) {
-        throw new Error('Shouldn\'t happen! endTime is null');
+        sdk.showNotification('negative', 'Shouldn\'t happen! endTime is null');
+        return;
       } else {
         this.endTime = endTime.time;
       }
 
-      this.currentList = [];
+      this.currentList = {};
       data.forEach(content => {
         this.currentList[content.time] = content;
       });
@@ -98,6 +123,15 @@ export const usePrecipitationStore = defineStore('precipitation', {
     },
     initResolution() {
       this.resolutionOptions = this.mapOptions[this.mapId].resolution;
+    },
+    initLegends() {
+      this.legendOptions = this.mapOptions[this.mapId].legends;
+    },
+    initTorrentialRain() {
+      this.torrentialRainAvailable = this.mapOptions[this.mapId].torrential_avail;
+      if (!this.torrentialRainAvailable) {
+        this.displayTorrentialRain = false;
+      }
     },
 
     changeResolution(resolution: string) {
@@ -119,7 +153,8 @@ export const usePrecipitationStore = defineStore('precipitation', {
     setCurrentData() {
       const data = this.currentList[this.currentTime];
       if (data === undefined) {
-        throw new Error('Shouldn\'t happen! currentList[currentTime] is null');
+        sdk.showNotification('negative', 'Shouldn\'t happen! currentList[currentTime] is null');
+        return
       }
 
       this.currentData = data;

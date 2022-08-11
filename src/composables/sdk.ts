@@ -1,4 +1,5 @@
 import {isRef, Ref, ref, unref, watchEffect} from 'vue';
+import {Notify} from 'quasar';
 
 class SDK {
   public apiUrl: string;
@@ -38,7 +39,7 @@ class SDK {
     }
   }
 
-  useFetch<T>(url: string) {
+  useFetch<T>(url: string, useCustomPrefix = false) {
     const data: Ref<Nullable<T>> = ref(null)
     const error = ref(null)
 
@@ -54,13 +55,34 @@ class SDK {
         })
     }
 
-    if (isRef(url)) {
-      watchEffect(() => doFetch(this.apiUrl))
+    if (!useCustomPrefix) {
+      if (isRef(url)) {
+        watchEffect(() => doFetch(this.apiUrl))
+      } else {
+        doFetch(this.apiUrl)
+      }
     } else {
-      doFetch(this.apiUrl)
+      if (isRef(url)) {
+        watchEffect(() => doFetch(''))
+      } else {
+        doFetch('')
+      }
     }
 
+    if (error.value !== null) {
+      this.showNotification('negative', error.value)
+    }
+
+
     return {data, error}
+  }
+
+  showNotification(type: string, message: string) {
+    Notify.create({
+      type: type,
+      message: message
+    })
+    console.error(message)
   }
 }
 

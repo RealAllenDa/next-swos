@@ -4,29 +4,38 @@
       @refresh="() => refreshPrecipitation('refresh')"
     ></MapSettings>
     <PrecipitationMap style="flex: 1"></PrecipitationMap>
+    <PageLoading :show="!initialized"></PageLoading>
   </q-page>
 </template>
 
 <script lang="ts">
-import {defineComponent, unref, watch} from 'vue';
+import {computed, defineComponent, onUnmounted, ref, Ref, watch} from 'vue';
 import MapSettings from 'components/PrecipFcstMapSettings.vue';
 import PrecipitationMap from 'components/PrecipFcstMap.vue';
 import {usePrecipitationStore} from 'stores/precipitation';
 import sdk from 'src/composables/sdk';
+import {useRoute} from 'vue-router';
+import PageLoading from 'components/PageLoading.vue';
 
 export default defineComponent({
   name: 'PrecipitationForecast',
-  components: {PrecipitationMap, MapSettings},
+  components: {PageLoading, PrecipitationMap, MapSettings},
   setup() {
     const precipitationStore = usePrecipitationStore();
+    const route = useRoute();
+    const routeResolution = computed(() => route.query.resolution);
+    const routeDuration = computed(() => route.query.duration);
+    const routeTorrential = computed(() => route.query.torrential === 'y');
+    const initialized: Ref<boolean> = ref(false);
 
     function initPrecipitation() {
       const {data: options} = sdk.useFetch<MapSpec>('/static/generic/analysis_map.json');
       watch(options, () => {
         if (options.value === null || options.value === undefined) {
-          throw new Error('Failed to refresh: spec is null or undefined.')
+          sdk.showNotification('negative', 'Failed to refresh: spec is null or undefined.')
         } else {
-          precipitationStore.setSpec(unref(options));
+          precipitationStore.setSpec(options.value);
+          precipitationStore.setOptions(<string>routeResolution.value, <string>routeDuration.value, routeTorrential.value);
         }
         refreshPrecipitation('initialize')
       })
@@ -36,17 +45,23 @@ export default defineComponent({
       const {data} = sdk.useFetch<PrecipitationAnalysisList>('/precip/analysis/list');
       watch(data, () => {
         if (data.value === null || data.value === undefined) {
-          throw new Error('Failed to refresh: data is null or undefined.')
+          sdk.showNotification('negative', 'Failed to refresh: data is null or undefined.')
         } else {
-          precipitationStore.setList(unref(data), mutationType);
+          precipitationStore.setList(data.value, mutationType);
+          initialized.value = true;
         }
       })
     }
 
     initPrecipitation()
 
+    onUnmounted(() => {
+      precipitationStore.$dispose()
+    })
+
     return {
-      refreshPrecipitation
+      refreshPrecipitation,
+      initialized
     }
   }
 });

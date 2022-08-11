@@ -2,6 +2,7 @@ declare interface PrecipitationAnalysisFile {
   time: number;
   file: string;
   bounds: [number, number][];
+  torrential_zone: string;
 }
 
 declare interface PrecipitationAnalysisList {
