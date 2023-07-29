@@ -20,11 +20,10 @@
       {{ i }}
     </text>
   </svg>
-  <svg v-if="torrentialZone"
-       height="60" viewBox="0 0 480 180" width="160" xmlns="http://www.w3.org/2000/svg">
-    <path d="M54 60 h 90 v 60 h -90 z" fill="#FF00FF" opacity=".75" stroke="#444" stroke-width="2"/>
-    <text font-family="Verdana" font-size="36" x="180" y="75">Localized</text>
-    <text font-family="Verdana" font-size="36" x="180" y="125">Torrential Rain</text>
+  <svg v-if="torrentialZone" height="60" viewBox="0 0 540 180" width="180">
+    <ellipse fill="none" rx="70" ry="30" stroke="red" stroke-width="9" transform="translate(85 85)"/>
+    <text font-family="Verdana" font-size="36" x="180" y="70">猛烈</text>
+    <text font-family="Verdana" font-size="36" x="180" y="120">降水带</text>
   </svg>
 </template>
 

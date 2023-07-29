@@ -117,7 +117,7 @@
     </q-btn>
     <q-btn :disable="!torrentialRainAvailable"
            :outline="!displayTorrentialRain"
-           class="q-mr-xl"
+           class="q-mr-sm"
            color="primary"
            icon="fa-solid fa-cloud-showers-heavy"
            @click="displayTorrentialRain = !displayTorrentialRain">
@@ -125,6 +125,30 @@
                  class="text-bold" self="center middle"
                  transition-duration="0">
         Localized Torrential Rain
+      </q-tooltip>
+    </q-btn>
+    <q-btn :disable="!gpvAvailable"
+           :outline="!displayGpv"
+           class="q-mr-sm"
+           color="primary"
+           icon="fa-solid fa-table-cells"
+           @click="displayGpv = !displayGpv">
+      <q-tooltip :offset="[0, 20]" anchor="top middle"
+                 class="text-bold" self="center middle"
+                 transition-duration="0">
+        GPV
+      </q-tooltip>
+    </q-btn>
+    <q-btn :disable="!rainMeasurementsAvailable"
+           :outline="!displayRainMeasurements"
+           class="q-mr-xl"
+           color="primary"
+           icon="fa-solid fa-droplet"
+           @click="displayRainMeasurements = !displayRainMeasurements">
+      <q-tooltip :offset="[0, 20]" anchor="top middle"
+                 class="text-bold" self="center middle"
+                 transition-duration="0">
+        1-hr. precipitation
       </q-tooltip>
     </q-btn>
   </q-toolbar>
@@ -297,6 +321,28 @@ export default defineComponent({
     });
     const torrentialRainAvailable = computed(() => precipitationStore.torrentialRainAvailable)
 
+    // GPV
+    const displayGpv = computed({
+      get() {
+        return precipitationStore.displayGpv
+      },
+      set() {
+        precipitationStore.displayGpv = !precipitationStore.displayGpv
+      }
+    });
+    const gpvAvailable = computed(() => precipitationStore.gpvAvailable)
+
+    // Rain Measurements
+    const displayRainMeasurements = computed({
+      get() {
+        return precipitationStore.displayRainMeasurements
+      },
+      set() {
+        precipitationStore.displayRainMeasurements = !precipitationStore.displayRainMeasurements
+      }
+    });
+    const rainMeasurementsAvailable = computed(() => precipitationStore.rainMeasurementsAvailable)
+
     return {
       // Resolution
       resolutionOptions,
@@ -325,7 +371,15 @@ export default defineComponent({
 
       // Torrential Rain
       displayTorrentialRain,
-      torrentialRainAvailable
+      torrentialRainAvailable,
+
+      // GPV
+      displayGpv,
+      gpvAvailable,
+
+      // Rain Measurements
+      displayRainMeasurements,
+      rainMeasurementsAvailable
     };
   }
 });

@@ -8,6 +8,7 @@ export const useTyphoonStore = defineStore('typhoon', {
 
     showInactiveTyphoons: true,
     showTyphoonForecastOrigins: ['中国', '中国台湾', '日本', '中国香港', '美国'] as string[],
+    currentTyphoonForecastOrigin: '中国',
 
     typhoonDisplayList: [] as string[],
     selectedTyphoonsInList: [] as TyphoonList[],
@@ -92,7 +93,7 @@ export const useTyphoonStore = defineStore('typhoon', {
         this.selectedTyphoonsInList.push(this.typhoons[typhoon]);
         this.typhoonsToFocus.push({
           label: this.getTyphoonId(this.typhoons[typhoon]),
-          value: this.typhoons[typhoon].id,
+          value: this.typhoons[typhoon].tfid,
         })
       });
       this.currentTyphoonFocus = this.typhoonsToFocus[0]?.value;
@@ -117,7 +118,7 @@ export const useTyphoonStore = defineStore('typhoon', {
           this.selectedTyphoonsInList.push(content)
           this.typhoonsToFocus.push({
             label: typhoonId,
-            value: content.id
+            value: content.tfid
           })
         }
       })
@@ -128,25 +129,25 @@ export const useTyphoonStore = defineStore('typhoon', {
     getFillBrand(point: string): string {
       let brand: string;
       switch (point) {
-        case '热带低压':
+        case '热带低压(TD)':
           brand = 'td';
           break;
-        case '热带低气压':
+        case '热带低气压(TD)':
           brand = 'td';
           break;
-        case '热带风暴':
+        case '热带风暴(TS)':
           brand = 'ts';
           break;
-        case '强热带风暴':
+        case '强热带风暴(STS)':
           brand = 'sts';
           break;
-        case '台风':
+        case '台风(TY)':
           brand = 'ty';
           break;
-        case '强台风':
+        case '强台风(STY)':
           brand = 'sty';
           break;
-        case '超强台风':
+        case '超强台风(Super TY)':
           brand = 'super-ty';
           break;
         default:

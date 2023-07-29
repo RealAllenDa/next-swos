@@ -17,6 +17,10 @@ export const usePrecipitationStore = defineStore('precipitation', {
 
     displayTorrentialRain: false,
     torrentialRainAvailable: false,
+    displayGpv: false,
+    gpvAvailable: false,
+    displayRainMeasurements: false,
+    rainMeasurementsAvailable: false,
 
     legendOptions: undefined as LegendOptions | undefined,
     mapOptions: {} as { [name: string]: MapInterface },
@@ -91,6 +95,8 @@ export const usePrecipitationStore = defineStore('precipitation', {
       this.initLegends();
       this.initResolution();
       this.initTorrentialRain();
+      this.initGpv();
+      this.initRainMeasurements();
 
       const dataId = this.mapOptions[this.mapId].data_id;
       let data: Nullable<Array<PrecipitationAnalysisFile>> =
@@ -131,6 +137,18 @@ export const usePrecipitationStore = defineStore('precipitation', {
       this.torrentialRainAvailable = this.mapOptions[this.mapId].torrential_avail;
       if (!this.torrentialRainAvailable) {
         this.displayTorrentialRain = false;
+      }
+    },
+    initGpv() {
+      this.gpvAvailable = this.mapOptions[this.mapId].gpv_avail;
+      if (!this.gpvAvailable) {
+        this.displayGpv = false;
+      }
+    },
+    initRainMeasurements() {
+      this.rainMeasurementsAvailable = this.mapOptions[this.mapId].rain_measurements_avail;
+      if (!this.rainMeasurementsAvailable) {
+        this.displayRainMeasurements = false;
       }
     },
 

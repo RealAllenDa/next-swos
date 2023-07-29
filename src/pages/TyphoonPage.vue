@@ -32,22 +32,23 @@ export default defineComponent({
         initialized.value = true;
       }
       selectedTyphoonsInList.value.forEach(typhoon => {
-        const {data} = sdk.useFetch<TyphoonDetail>(`/typhoon/detail/${typhoon.id}?_=${new Date().getTime()}`);
+        const {data} = sdk.useFetch<TyphoonDetail[]>(`https://api.daziannetwork.com/warning/typhoon_detail?id=${typhoon.tfid}&_=${new Date().getTime()}`, true);
         watch(data, () => {
           if (data.value === null || data.value === undefined) {
             sdk.showNotification('negative', 'Failed to fetch typhoon detail')
             return
           }
-          typhoons[typhoon.id.toString()] = data.value;
+          typhoons[typhoon.tfid] = data.value[0];
           if (Object.keys(typhoons).length === selectedTyphoonsInList.value.length) {
             typhoonStore.currentTyphoons = typhoons;
+
             initialized.value = true;
           }
         })
       });
     }
 
-    const {data: typhoonList} = sdk.useFetch<TyphoonList[]>(`/typhoon/list?_=${new Date().getTime()}`);
+    const {data: typhoonList} = sdk.useFetch<TyphoonList[]>(`https://api.daziannetwork.com/warning/typhoon_activity?_=${new Date().getTime()}`, true);
     watch(typhoonList, () => {
       if (typhoonList.value === null || typhoonList.value === undefined) {
         sdk.showNotification('negative', 'Failed to refresh: list is null or undefined.')

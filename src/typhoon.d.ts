@@ -4,62 +4,61 @@ declare interface TyphoonList {
   is_active: number;
   name: string;
   start_time: string;
-  id: string;
+  tfid: string;
 }
 
 declare interface TyphoonLandDetail {
-  info: string;
+  land_info: string;
   land_address: string;
   land_time: string;
-  latitude: string;
-  longitude: string;
-  strength: string;
+  latitude: string; // FIXME Not present
+  longitude: string; // FIXME Not present
+  level: string;
 }
 
 declare interface TyphoonForecastPoint {
   latitude: string;
   longitude: string;
   power: string;
-  pressure: string;
   speed: number;
-  strength: string;
-  forecast_time: string;
+  strong: string;
+  time: string;
 }
 
 declare interface TyphoonForecast {
-  forecast_points: TyphoonForecastPoint[];
-  origin: string;
+  points: TyphoonForecastPoint[];
+  sets: string;
+}
+
+declare interface TyphoonWindRadius {
+  ne: number;
+  se: number;
+  sw: number;
+  nw: number;
 }
 
 declare interface TyphoonPoints {
-  forecast: TyphoonForecast[];
+  forecast: TyphoonForecast[] | null;
   latitude: string;
   longitude: string;
-  move_direction: string;
+  move_dir: string;
   move_speed: number;
   power: number;
   pressure: number;
-  r10: string;
-  r12: string;
-  r7: string;
+  radius10_quad: TyphoonWindRadius;
+  radius12_quad: TyphoonWindRadius;
+  radius7_quad: TyphoonWindRadius;
   speed: number;
-  strength: string;
-  forecast_time: string;
+  strong: string;
+  time: string;
   position_explanation?: string;
   typhoon_explanation?: string;
 }
 
 declare interface TyphoonDetail {
-  center_latitude: string;
-  center_longitude: string;
-  end_time: string;
-  eng_name: string;
-  is_active: number;
-  start_time: string;
-  land_info: TyphoonLandDetail[];
+  land: TyphoonLandDetail[];
   name: string;
   points: TyphoonPoints[];
-  id: string;
 }
 
 declare interface TyphoonDetailTable {
@@ -69,4 +68,5 @@ declare interface TyphoonDetailTable {
   move_speed: string;
   category: string;
   index: number;
+  is_forecast: boolean;
 }

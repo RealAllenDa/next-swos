@@ -26,6 +26,8 @@ declare interface MapInterface {
   resolution: ChooseOptions[];
   legends: LegendOptions;
   torrential_avail: boolean;
+  gpv_avail: boolean;
+  rain_measurements_avail: boolean;
 }
 
 declare interface MapSpec {

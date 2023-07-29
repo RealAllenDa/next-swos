@@ -9,11 +9,7 @@
           SWoS - {{ currentTitle }}
         </q-toolbar-title>
 
-        <marquee-text
-          class="q-ml-xl"
-          style="max-width: 600px;">
-          Testetete
-        </marquee-text>
+        <StatusMarquee></StatusMarquee>
       </q-toolbar>
     </q-header>
 
@@ -45,7 +41,7 @@
       <q-toolbar>
         <q-toolbar-title>
           &copy; {{ new Date().getFullYear() }} SWoS, HomeNetwork, AllenDa.
-          HomeNetwork Confidential. All Rights Reserved. Unauthorized Disclosure prohibited.
+          数据来自雷达观测，并不代表官方。
         </q-toolbar-title>
       </q-toolbar>
     </q-footer>
@@ -57,13 +53,13 @@
 import {computed, defineComponent, onMounted, ref} from 'vue';
 import sdk from 'src/composables/sdk';
 import {useRoute} from 'vue-router';
-import MarqueeText from 'vue-marquee-text-component';
+import StatusMarquee from 'components/StatusMarquee.vue';
 
 export default defineComponent({
   name: 'MainLayout',
 
   components: {
-    MarqueeText
+    StatusMarquee
   },
 
   setup() {

@@ -1,5 +1,5 @@
 <template>
-  <div style="max-width: 460px;">
+  <div style="max-width: 520px;">
     <q-card>
       <q-tabs
         :model-value="currentTyphoonName"
@@ -84,6 +84,7 @@
 import {computed, defineComponent, ref} from 'vue';
 import {useTyphoonStore} from 'stores/typhoon';
 import {format, parse} from 'date-fns';
+import sdk from 'src/composables/sdk';
 
 export default defineComponent({
   name: 'TyphoonSelection',
@@ -100,20 +101,53 @@ export default defineComponent({
       }
       const currentTyphoon = typhoonStore.currentTyphoons[currentTyphoonName.value];
       console.log(currentTyphoon)
+
       let content: TyphoonDetailTable[] = [];
+
+      const forecasts = currentTyphoon.points[currentTyphoon.points.length - 1].forecast;
+      if (forecasts !== null) {
+        const selectedForecast = forecasts.find(
+          t => t.sets === typhoonStore.currentTyphoonForecastOrigin
+        );
+        // noinspection JSIncompatibleTypesComparison
+        if (selectedForecast !== undefined) {
+          const reversedForecast = [...selectedForecast.points].reverse();
+          reversedForecast.pop(); // Pop unwanted nowcast
+          reversedForecast.forEach((point, index) => {
+            // Time: yyyy-MM-ddTH:mm:ss => MM/dd HH:mm
+            const time = point.time.replace('T', ' ');
+            const date = parse(time, 'yyyy-MM-dd HH:mm:ss', new Date());
+            content.push({
+              date: format(date, 'MM/dd HH:mm'),
+              pressure: '---',
+              speed: point.speed.toString(),
+              move_speed: '---',
+              category: point.strong,
+              index: -(index + 1),
+              is_forecast: true
+            })
+          })
+        } else {
+          sdk.showNotification('negative', 'No forecast available');
+        }
+      }
+
       const reversedPoints = [...currentTyphoon.points].reverse();
       reversedPoints.forEach((point, index) => {
-        // Time: yyyy/M/d H:mm:ss => MM/dd HH:mm
-        const date = parse(point.forecast_time, 'yyyy/M/d H:mm:ss', new Date());
+        // Time: yyyy-MM-ddTH:mm:ss => MM/dd HH:mm
+        const time = point.time.replace('T', ' ');
+        const date = parse(time, 'yyyy-MM-dd HH:mm:ss', new Date());
         content.push({
           date: format(date, 'MM/dd HH:mm'),
           pressure: point.pressure.toString(),
           speed: point.speed.toString(),
           move_speed: point.move_speed === 0 ? 'Slow' : point.move_speed.toString(),
-          category: point.strength,
-          index: index
+          category: point.strong,
+          index: index,
+          is_forecast: false
         })
       })
+
       console.log(content)
       return content;
     });

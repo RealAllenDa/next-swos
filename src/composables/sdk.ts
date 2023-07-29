@@ -17,7 +17,7 @@ class SDK {
       this.useProductionAPI = true;
     }
     if (!this.useProductionAPI) {
-      this.apiUrl = 'http://127.0.0.1:8000';
+      this.apiUrl = 'http://10.0.0.100:8000';
     } else {
       this.apiUrl = 'https://api.daziannetwork.com'; // TODO
     }
@@ -40,32 +40,34 @@ class SDK {
   }
 
   useFetch<T>(url: string, useCustomPrefix = false) {
-    const data: Ref<Nullable<T>> = ref(null)
+    // IMPORTANT: Set data to undefined first
+    // Undefined is for not-fetched data; null is for errored data
+    const data: Ref<Nullable<T>> = ref(undefined)
     const error = ref(null)
 
-    function doFetch(apiUrl: string) {
-      data.value = null
+    function doFetch(apiUrl: string, that: SDK) {
+      data.value = undefined
       error.value = null
       fetch(`${apiUrl}${unref(url)}`)
         .then((res) => res.json())
-        .then((json) => (data.value = json))
+        .then((json) => (data.value = json['status'] !== -1 ? json : null))
         .catch((err) => {
           error.value = err;
-          console.error(err)
+          that.showNotification('negative', `Failed to fetch ${url}: ${err}`)
         })
     }
 
     if (!useCustomPrefix) {
       if (isRef(url)) {
-        watchEffect(() => doFetch(this.apiUrl))
+        watchEffect(() => doFetch(this.apiUrl, this))
       } else {
-        doFetch(this.apiUrl)
+        doFetch(this.apiUrl, this)
       }
     } else {
       if (isRef(url)) {
-        watchEffect(() => doFetch(''))
+        watchEffect(() => doFetch('', this))
       } else {
-        doFetch('')
+        doFetch('', this)
       }
     }
 

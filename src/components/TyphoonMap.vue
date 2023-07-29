@@ -33,25 +33,25 @@ export default defineComponent({
     function getFillColor(point: string): string {
       let color: string;
       switch (point) {
-        case '热带低压':
+        case '热带低压(TD)':
           color = '#00D5CB';
           break;
-        case '热带低气压':
+        case '热带低气压(TD)':
           color = '#00D5CB';
           break;
-        case '热带风暴':
+        case '热带风暴(TS)':
           color = '#FCFA00';
           break;
-        case '强热带风暴':
+        case '强热带风暴(STS)':
           color = '#FDAE0D';
           break;
-        case '台风':
+        case '台风(TY)':
           color = '#FB3B00';
           break;
-        case '强台风':
+        case '强台风(STY)':
           color = '#FC4D80';
           break;
-        case '超强台风':
+        case '超强台风(Super TY)':
           color = '#C2218E';
           break;
         default:
@@ -96,13 +96,13 @@ export default defineComponent({
       landInfoLayer.value.clearLayers()
 
       for (const i in currentTyphoons.value) {
-        const landInfo = currentTyphoons.value[i].land_info;
+        const landInfo = currentTyphoons.value[i].land;
         landInfo.forEach(land => {
           const icon = new DivIcon({
             iconAnchor: [20, 20],
             html: `<div class="dot">
             <div class="ring"></div>
-            <div class="land-icon" style="border-bottom: 11px solid ${getFillColor(land.strength)};"></div></div>`,
+            <div class="land-icon" style="border-bottom: 11px solid ${getFillColor(land.level)};"></div></div>`,
             className: 'attention-icon',
           });
           const pointLayer = new Marker([parseFloat(land.latitude), parseFloat(land.longitude)], {
@@ -122,7 +122,13 @@ export default defineComponent({
     const nowcastPointLayer: Ref<Nullable<FeatureGroup>> = ref();
 
     const enableForecastOrigin = computed(() => typhoonStore.showTyphoonForecastOrigins);
-    const currentTyphoonIndex = computed(() => typhoonStore.currentTyphoonIndex);
+    const currentTyphoonIndex = computed(() => {
+      if (typhoonStore.currentTyphoonIndex >= 0) {
+        return typhoonStore.currentTyphoonIndex;
+      } else {
+        return typhoonStore.currentTyphoonIndex + 9999;
+      }
+    });
 
     function drawNowcastPoints() {
       if (map.value === null || map.value === undefined ||
@@ -149,7 +155,7 @@ export default defineComponent({
               iconAnchor: [20, 20],
               html: `<div class="dot">
             <div class="ring"></div>
-            <div class="icon" style="background: ${getFillColor(point.strength)}"></div></div>`,
+            <div class="icon" style="background: ${getFillColor(point.strong)}"></div></div>`,
               className: 'attention-icon',
             });
             pointLayer = new Marker([parseFloat(point.latitude), parseFloat(point.longitude)], {
@@ -159,7 +165,7 @@ export default defineComponent({
           } else {
             pointLayer = new CircleMarker([parseFloat(point.latitude), parseFloat(point.longitude)], {
               radius: 6,
-              fillColor: getFillColor(point.strength),
+              fillColor: getFillColor(point.strong),
               stroke: true,
               weight: 2,
               color: '#353433',
@@ -204,23 +210,45 @@ export default defineComponent({
         if (!Object.keys(typhoonForecastsPolyline).includes(i)) {
           typhoonForecastsPolyline.value[i] = {};
         }
+        if (content.forecast === null) {
+          continue;
+        }
         content.forecast.forEach((forecast) => {
-          if (enableForecastOrigin.value.includes(forecast.origin)) {
-            if (!Object.keys(typhoonForecastsPolyline.value[i]).includes(forecast.origin)) {
-              typhoonForecastsPolyline.value[i][forecast.origin] = [];
+          if (enableForecastOrigin.value.includes(forecast.sets)) {
+            if (!Object.keys(typhoonForecastsPolyline.value[i]).includes(forecast.sets)) {
+              // include the last point of the nowcast
+              typhoonForecastsPolyline.value[i][forecast.sets] = [
+                typhoonNowcastPolyline.value[i][typhoonNowcastPolyline.value[i].length - 1]
+              ];
             }
-            forecast.forecast_points.forEach(point => {
-              const pointLayer = new CircleMarker([parseFloat(point.latitude), parseFloat(point.longitude)], {
-                radius: 6,
-                fillColor: getFillColor(point.strength),
-                stroke: true,
-                weight: 2,
-                color: '#353433',
-                fillOpacity: 1,
-                pane: 'markerPane'
-              })
+            forecast.points.forEach((point, index) => {
+              const isCurrent = index === forecast.points.length + (currentTyphoonIndex.value - 9999);
+              let pointLayer;
+              if (isCurrent) {
+                const icon = new DivIcon({
+                  iconAnchor: [20, 20],
+                  html: `<div class="dot">
+            <div class="ring"></div>
+            <div class="icon" style="background: ${getFillColor(point.strong)}"></div></div>`,
+                  className: 'attention-icon',
+                });
+                pointLayer = new Marker([parseFloat(point.latitude), parseFloat(point.longitude)], {
+                  icon: icon,
+                  pane: 'tooltipPane'
+                });
+              } else {
+                pointLayer = new CircleMarker([parseFloat(point.latitude), parseFloat(point.longitude)], {
+                  radius: 6,
+                  fillColor: getFillColor(point.strong),
+                  stroke: true,
+                  weight: 2,
+                  color: '#353433',
+                  fillOpacity: 1,
+                  pane: 'markerPane'
+                })
+              }
               forecastPointsLayer.value?.addLayer(pointLayer);
-              typhoonForecastsPolyline.value[i][forecast.origin].push(
+              typhoonForecastsPolyline.value[i][forecast.sets].push(
                 new LatLng(parseFloat(point.latitude), parseFloat(point.longitude))
               )
             })
@@ -276,14 +304,11 @@ export default defineComponent({
     //    3      |      4
 
     // Data shape
-    // 2 | 4 | 1 | 3
+    // 2ne | 4se | 1nw | 3sw
     const strengthCircleLayer: Ref<Nullable<FeatureGroup>> = ref();
 
-    function drawStrength(circleString: string, latLng: LatLngExpression, strength: number) {
-      const circles = circleString.split('|');
-      if (circles.length < 4) {
-        return;
-      }
+    function drawStrength(circle: TyphoonWindRadius, latLng: LatLngExpression, strength: number) {
+      const circles = [circle.ne, circle.se, circle.nw, circle.sw];
       let color = 'white', opacity = 0.1;
       if (strength === 7) {
         color = '#fff500';
@@ -298,7 +323,7 @@ export default defineComponent({
         sdk.showNotification('negative', 'Failed to draw typhoon circle: Color unknown');
         return;
       }
-      circles.forEach((radius, i) => {
+      circles.forEach((radius: number, i: number) => {
         let index = i;
         if (i === 2) {
           index++;
@@ -307,7 +332,7 @@ export default defineComponent({
         }
 
         const circle = new Semicircle(latLng, {
-          radius: parseInt(radius) * 1000,
+          radius: radius * 1000,
           startAngle: index * 90,
           stopAngle: (index + 1) * 90,
           fillColor: color,
@@ -329,17 +354,17 @@ export default defineComponent({
         currentTyphoons.value[i].points.length - (currentTyphoonIndex.value + 1)
           ];
         drawStrength(
-          currentTyphoonPoint.r7,
+          currentTyphoonPoint.radius7_quad,
           [parseFloat(currentTyphoonPoint.latitude), parseFloat(currentTyphoonPoint.longitude)],
           7
         );
         drawStrength(
-          currentTyphoonPoint.r10,
+          currentTyphoonPoint.radius10_quad,
           [parseFloat(currentTyphoonPoint.latitude), parseFloat(currentTyphoonPoint.longitude)],
           10
         );
         drawStrength(
-          currentTyphoonPoint.r12,
+          currentTyphoonPoint.radius12_quad,
           [parseFloat(currentTyphoonPoint.latitude), parseFloat(currentTyphoonPoint.longitude)],
           12
         );
@@ -428,6 +453,10 @@ export default defineComponent({
       fitBounds()
     }
 
+    function redrawPoint() {
+      drawForecastPoints()
+    }
+
     // Hooks
     watch(currentTyphoons, () => {
       redrawTyphoon()
@@ -438,7 +467,11 @@ export default defineComponent({
     })
 
     watch(currentTyphoonIndex, () => {
-      redrawTyphoon()
+      if (currentTyphoonIndex.value >= 999) {
+        redrawPoint()
+      } else {
+        redrawTyphoon()
+      }
     })
 
     onMounted(() => {
