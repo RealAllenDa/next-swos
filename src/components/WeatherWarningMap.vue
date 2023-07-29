@@ -49,7 +49,7 @@ export default defineComponent({
     }
     const parseLevel = weatherWarningStore.parseLevel;
 
-    const {data} = sdk.useFetch<GeoJsonObject>('https://geo.datav.aliyun.com/areas_v3/bound/geojson?code=310000_full', true)
+    const {data} = sdk.useFetch<GeoJsonObject>('/parse/base/shanghai.geojson')
     watch(data, () => {
       if (data.value === undefined || data.value === null ||
         map === undefined || map === null ||

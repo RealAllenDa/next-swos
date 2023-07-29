@@ -31,7 +31,7 @@
     </q-btn>
     <q-slider
       :disable="isInPlayback"
-      :label-value="formatTime(timeLabel)"
+      :label-value="formatTime(hoverTime)"
       :marker-labels="val => ({label: labelTime(val)})"
       :max="latestTime"
       :min="startTime"
@@ -43,7 +43,8 @@
       markers
       snap
       style="min-width: 250px;"
-      @change="val => {timeLabel = val}"
+      @change="val => {timeLabel = val; hoverTime = val}"
+      @update:model-value="val => {hoverTime = val}"
     ></q-slider>
     <q-btn :disable="timeLabel === latestTime || isInPlayback"
            class="q-mr-sm"
@@ -206,6 +207,7 @@ export default defineComponent({
     });
 
     // Time
+    const hoverTime = ref(precipitationStore.currentTime);
     const startTime = computed(() => precipitationStore.startTime);
     const step = computed(() => precipitationStore.step);
     const latestTime = computed(() => precipitationStore.endTime);
@@ -352,6 +354,7 @@ export default defineComponent({
       selectedResolution,
 
       // Time
+      hoverTime,
       startTime,
       step,
       latestTime,

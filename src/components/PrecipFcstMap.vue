@@ -344,9 +344,10 @@ export default defineComponent({
         dragRotate: false,
         touchPitch: false,
         keyboard: false,
+        preserveDrawingBuffer: true,
         style: {
           'version': 8,
-          'glyphs': './public/{fontstack}/{range}.pbf',
+          'glyphs': './{fontstack}/{range}.pbf',
           'sources': {
             'base-raster': {
               'type': 'raster',

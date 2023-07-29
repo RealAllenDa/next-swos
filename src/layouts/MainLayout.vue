@@ -40,7 +40,7 @@
     <q-footer class="bg-grey-8 text-white" elevated reveal>
       <q-toolbar>
         <q-toolbar-title>
-          数据未经过质控，仅做参考用，不应用于防灾，也不代表官方观点。
+          数据未经官方质控，仅做参考用，不应用于防灾，也不代表官方。
         </q-toolbar-title>
       </q-toolbar>
     </q-footer>
