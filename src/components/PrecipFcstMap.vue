@@ -11,7 +11,7 @@
 <script lang="ts">
 import {computed, defineComponent, onMounted, ref, Ref, watch} from 'vue';
 import 'leaflet/dist/leaflet.css';
-import {Canvas, Control, GeoJSON, Map} from 'leaflet';
+import {Canvas, Control, GeoJSON, ImageOverlay, LatLngBounds, Map} from 'leaflet';
 import {useMapStore} from 'stores/map';
 import {usePrecipitationStore} from 'stores/precipitation';
 import sdk from 'src/composables/sdk';
@@ -36,7 +36,7 @@ export default defineComponent({
     const isLastTime = computed(() => precipitationStore.endTime === precipitationStore.currentTime);
 
     const legend: Ref<typeof MapControl | null> = ref(null);
-    const layer: Ref<Nullable<L.VectorGrid.Slicer>> = ref();
+    const layer: Ref<Nullable<ImageOverlay>> = ref();
     const torrentialRainLayer: Ref<Nullable<GeoJSON>> = ref();
     const gpvLayer: Ref<Nullable<GeoJSON>> = ref();
     const gpvRenderer: Ref<Nullable<Canvas>> = ref();
