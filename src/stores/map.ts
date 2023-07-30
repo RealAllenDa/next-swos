@@ -1,7 +1,7 @@
 import {defineStore} from 'pinia';
 import {LatLngExpression} from 'leaflet';
 
-export const useMapStore = defineStore('map', {
+export const useLeafletMapStore = defineStore('map', {
   state: () => ({
     options: {
       center: [31.259183024923097, 121.51016235351564],

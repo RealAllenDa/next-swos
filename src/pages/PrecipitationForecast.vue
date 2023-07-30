@@ -9,7 +9,7 @@
 </template>
 
 <script lang="ts">
-import {computed, defineComponent, onUnmounted, ref, Ref, watch} from 'vue';
+import {computed, defineComponent, onUnmounted, watch} from 'vue';
 import MapSettings from 'components/PrecipFcstMapSettings.vue';
 import PrecipitationMap from 'components/PrecipFcstMap.vue';
 import {usePrecipitationStore} from 'stores/precipitation';
@@ -26,7 +26,14 @@ export default defineComponent({
     const routeResolution = computed(() => route.query.resolution);
     const routeDuration = computed(() => route.query.duration);
     const routeTorrential = computed(() => route.query.torrential === 'y');
-    const initialized: Ref<boolean> = ref(false);
+    const initialized = computed({
+      get() {
+        return precipitationStore.initialized
+      },
+      set() {
+        precipitationStore.initialized = true;
+      }
+    });
 
     function initPrecipitation() {
       const {data: options} = sdk.useFetch<MapSpec>('/static/generic/analysis_map.json');

@@ -9,7 +9,7 @@
           SWoS - {{ currentTitle }}
         </q-toolbar-title>
 
-        <StatusMarquee></StatusMarquee>
+        <!--        <StatusMarquee></StatusMarquee>-->
       </q-toolbar>
     </q-header>
 
@@ -40,8 +40,7 @@
     <q-footer class="bg-grey-8 text-white" elevated reveal>
       <q-toolbar>
         <q-toolbar-title>
-          &copy; {{ new Date().getFullYear() }} SWoS, HomeNetwork, AllenDa.
-          数据来自雷达观测，并不代表官方。
+          数据未经过质控，仅做参考用，不应用于防灾，也不代表官方观点。
         </q-toolbar-title>
       </q-toolbar>
     </q-footer>
@@ -53,14 +52,11 @@
 import {computed, defineComponent, onMounted, ref} from 'vue';
 import sdk from 'src/composables/sdk';
 import {useRoute} from 'vue-router';
-import StatusMarquee from 'components/StatusMarquee.vue';
 
 export default defineComponent({
   name: 'MainLayout',
 
-  components: {
-    StatusMarquee
-  },
+  components: {},
 
   setup() {
     const route = useRoute()

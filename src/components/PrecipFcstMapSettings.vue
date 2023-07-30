@@ -1,9 +1,8 @@
 <template>
-  <q-toolbar class="q-mt-lg q-pt-md q-pl-xl q-pr-xl">
+  <q-toolbar class="q-mt-lg q-pt-md q-pl-xl q-pr-xl row" style="flex-wrap: wrap !important;">
     <q-btn-toggle
       v-model="selectedTime"
-      :options="timeOptions"
-      class="q-ml-xl">
+      :options="timeOptions">
     </q-btn-toggle>
 
     <q-separator
@@ -31,18 +30,20 @@
       </q-tooltip>
     </q-btn>
     <q-slider
-      v-model="timeLabel"
       :disable="isInPlayback"
       :label-value="formatTime(timeLabel)"
       :marker-labels="val => ({label: labelTime(val)})"
       :max="latestTime"
       :min="startTime"
+      :model-value="timeLabel"
       :step="step"
-      class="q-ml-xl q-mr-xl"
+      class="q-ml-xl q-mr-xl col"
       label
       label-always
       markers
       snap
+      style="min-width: 250px;"
+      @change="val => {timeLabel = val}"
     ></q-slider>
     <q-btn :disable="timeLabel === latestTime || isInPlayback"
            class="q-mr-sm"
@@ -115,42 +116,44 @@
         </q-list>
       </q-menu>
     </q-btn>
-    <q-btn :disable="!torrentialRainAvailable"
-           :outline="!displayTorrentialRain"
-           class="q-mr-sm"
-           color="primary"
-           icon="fa-solid fa-cloud-showers-heavy"
-           @click="displayTorrentialRain = !displayTorrentialRain">
-      <q-tooltip :offset="[0, 20]" anchor="top middle"
-                 class="text-bold" self="center middle"
-                 transition-duration="0">
-        Localized Torrential Rain
-      </q-tooltip>
-    </q-btn>
-    <q-btn :disable="!gpvAvailable"
-           :outline="!displayGpv"
-           class="q-mr-sm"
-           color="primary"
-           icon="fa-solid fa-table-cells"
-           @click="displayGpv = !displayGpv">
-      <q-tooltip :offset="[0, 20]" anchor="top middle"
-                 class="text-bold" self="center middle"
-                 transition-duration="0">
-        GPV
-      </q-tooltip>
-    </q-btn>
-    <q-btn :disable="!rainMeasurementsAvailable"
-           :outline="!displayRainMeasurements"
-           class="q-mr-xl"
-           color="primary"
-           icon="fa-solid fa-droplet"
-           @click="displayRainMeasurements = !displayRainMeasurements">
-      <q-tooltip :offset="[0, 20]" anchor="top middle"
-                 class="text-bold" self="center middle"
-                 transition-duration="0">
-        1-hr. precipitation
-      </q-tooltip>
-    </q-btn>
+    <div>
+      <q-btn :disable="!torrentialRainAvailable"
+             :outline="!displayTorrentialRain"
+             class="q-mr-sm"
+             color="primary"
+             icon="fa-solid fa-cloud-showers-heavy"
+             @click="displayTorrentialRain = !displayTorrentialRain">
+        <q-tooltip :offset="[0, 20]" anchor="top middle"
+                   class="text-bold" self="center middle"
+                   transition-duration="0">
+          Localized Torrential Rain
+        </q-tooltip>
+      </q-btn>
+      <q-btn :disable="!gpvAvailable"
+             :outline="!displayGpv"
+             class="q-mr-sm"
+             color="primary"
+             icon="fa-solid fa-table-cells"
+             @click="displayGpv = !displayGpv">
+        <q-tooltip :offset="[0, 20]" anchor="top middle"
+                   class="text-bold" self="center middle"
+                   transition-duration="0">
+          GPV
+        </q-tooltip>
+      </q-btn>
+      <q-btn :disable="!rainMeasurementsAvailable"
+             :outline="!displayRainMeasurements"
+             class="q-mr-xl"
+             color="primary"
+             icon="fa-solid fa-droplet"
+             @click="displayRainMeasurements = !displayRainMeasurements">
+        <q-tooltip :offset="[0, 20]" anchor="top middle"
+                   class="text-bold" self="center middle"
+                   transition-duration="0">
+          1-hr. precipitation
+        </q-tooltip>
+      </q-btn>
+    </div>
   </q-toolbar>
 </template>
 

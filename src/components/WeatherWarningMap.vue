@@ -16,7 +16,7 @@
 <script lang="ts">
 import {computed, defineComponent, onMounted, ref, Ref, toRaw, watch} from 'vue';
 import {GeoJSON, Layer, LeafletMouseEvent, Map, TileLayer} from 'leaflet';
-import {useMapStore} from 'stores/map';
+import {useLeafletMapStore} from 'stores/map';
 import 'leaflet/dist/leaflet.css';
 import sdk from 'src/composables/sdk';
 import {Feature, GeoJsonObject} from 'geojson';
@@ -29,7 +29,7 @@ export default defineComponent({
   name: 'WeatherWarningMap',
   components: {WeatherWarningDetail, WeatherWarningLegend, MapControl},
   setup() {
-    const mapStore = useMapStore();
+    const mapStore = useLeafletMapStore();
     const weatherWarningStore = useWeatherWarningStore();
     let map: Nullable<Map> = null;
     const legend: Ref<typeof MapControl | null> = ref(null);
@@ -119,7 +119,7 @@ export default defineComponent({
       } else {
         districtName = feature.properties?.name;
       }
-      
+
       const warnings: string[] = [];
       if (Object.keys(weatherWarningList.value.districts).includes(districtName)) {
         const weatherWarning = weatherWarningList.value.districts[districtName];

@@ -1,8 +1,10 @@
 import {defineStore} from 'pinia';
 import sdk from 'src/composables/sdk';
+import {format} from 'date-fns'
 
 export const usePrecipitationStore = defineStore('precipitation', {
   state: () => ({
+    initialized: false,
     startTime: 0,
     endTime: 0,
     currentTime: 0,
@@ -14,6 +16,7 @@ export const usePrecipitationStore = defineStore('precipitation', {
     list: undefined as Nullable<PrecipitationAnalysisList>,
     currentList: {} as { [time: number]: PrecipitationAnalysisFile },
     currentData: undefined as Nullable<PrecipitationAnalysisFile>,
+    dataChanged: false,
 
     displayTorrentialRain: false,
     torrentialRainAvailable: false,
@@ -21,9 +24,11 @@ export const usePrecipitationStore = defineStore('precipitation', {
     gpvAvailable: false,
     displayRainMeasurements: false,
     rainMeasurementsAvailable: false,
+    rainMeasurementsTime: '',
 
     legendOptions: undefined as LegendOptions | undefined,
     mapOptions: {} as { [name: string]: MapInterface },
+    mapIsLoading: false,
     timeOptions: [
       {label: '1H', value: '1h'},
       {label: '3H', value: '3h'},
@@ -37,6 +42,9 @@ export const usePrecipitationStore = defineStore('precipitation', {
   getters: {
     mapId: (state) => {
       return `${state.selectedDuration}_${state.selectedResolution}`
+    },
+    currentTimeFormatted: (state) => {
+      return format(new Date(state.currentTime * 1000), 'yyyy-MM-dd HH:mm');
     }
   },
   actions: {
@@ -165,6 +173,9 @@ export const usePrecipitationStore = defineStore('precipitation', {
         console.warn('Invalid time')
         return
       }
+      if (this.mapIsLoading) {
+        return;
+      }
       this.currentTime = time;
       this.setCurrentData();
     },
@@ -176,6 +187,7 @@ export const usePrecipitationStore = defineStore('precipitation', {
       }
 
       this.currentData = data;
+      this.dataChanged = true;
     }
   }
 });
