@@ -16,10 +16,6 @@ const routes: RouteRecordRaw[] = [
     component: () => import('layouts/MainLayout.vue'),
     children: [
       {
-        path: 'nowcast',
-        component: () => import('pages/PrecipitationNowcast.vue')
-      },
-      {
         path: 'forecast',
         component: () => import('pages/PrecipitationForecast.vue')
       },

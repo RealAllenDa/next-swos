@@ -11,6 +11,7 @@ import WeatherWarningMap from 'components/WeatherWarningMap.vue';
 import sdk from 'src/composables/sdk';
 import {useWeatherWarningStore} from 'stores/weather-warning';
 import PageLoading from 'components/PageLoading.vue';
+import {useGenericStore} from 'stores/generic';
 
 export default defineComponent({
   name: 'WeatherWarning',
@@ -31,6 +32,7 @@ export default defineComponent({
       }
     });
 
+    useGenericStore().initPageSpec(false, false, false)
     onUnmounted(() => {
       weatherWarningStore.$dispose()
     })

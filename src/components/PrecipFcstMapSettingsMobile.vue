@@ -1,95 +1,77 @@
 <template>
-  <q-toolbar class="q-pl-xl q-pr-xl row q-mb-lg q-mt-lg q-pb-sm" style="flex-wrap: wrap !important;">
-    <q-btn-toggle
-      v-model="selectedTime"
-      :options="timeOptions">
-    </q-btn-toggle>
+  <q-toolbar class="q-mt-sm row" style="flex-wrap: wrap !important;">
 
-    <q-separator
-      spaced="lg"
-      vertical></q-separator>
-
-    <q-btn-toggle
-      v-if="genericStore.debuggingEnabled"
-      v-model="selectedResolution"
-      :options="resolutionOptions">
-    </q-btn-toggle>
-
-    <q-separator
-      v-if="genericStore.debuggingEnabled"
-      spaced="lg"
-      vertical></q-separator>
-
-    <q-btn :disable="timeLabel === startTime || isInPlayback"
-           color="primary"
-           icon="skip_previous"
-           outline
-           type="a"
-           @click="timeBackward">
-      <q-tooltip :offset="[0, 20]" anchor="top middle"
-                 class="text-bold" self="center middle"
-                 transition-duration="0">
-        Previous (Ctrl+←)
-      </q-tooltip>
-    </q-btn>
-    <div ref="slider" class="q-ml-lg q-mr-lg col" style="min-width: 250px;"></div>
-    <q-btn :disable="timeLabel === latestTime || isInPlayback"
-           class="q-mr-sm"
-           color="primary"
-           icon="skip_next"
-           outline
-           type="a"
-           @click="timeForward">
-      <q-tooltip :offset="[0, 20]" anchor="top middle"
-                 class="text-bold" self="center middle"
-                 transition-duration="0">
-        Next (Ctrl+→)
-      </q-tooltip>
-    </q-btn>
-    <q-btn :disable="isInPlayback"
-           class="q-mr-lg"
-           color="primary"
-           icon="update"
-           @click="$emit('refresh')">
-      <q-tooltip :offset="[0, 20]" anchor="top middle"
-                 class="text-bold" self="center middle"
-                 transition-duration="0">
-        Refresh (Shift+Enter)
-      </q-tooltip>
-    </q-btn>
     <q-btn v-if="isInPlayback"
            class="q-mr-sm"
            color="primary"
            icon="stop"
            outline
+           padding="sm"
            @click="endPlayback">
-      <q-tooltip :offset="[0, 20]" anchor="top middle"
-                 class="text-bold" self="center middle"
-                 transition-duration="0">
-        Stop (Ctrl+Enter)
-      </q-tooltip>
     </q-btn>
     <q-btn v-else
            class="q-mr-sm"
            color="primary"
            icon="play_arrow"
            outline
+           padding="sm"
            @click="startPlayback">
-      <q-tooltip :offset="[0, 20]" anchor="top middle"
-                 class="text-bold" self="center middle"
-                 transition-duration="0">
-        Play (Ctrl+Enter)
-      </q-tooltip>
     </q-btn>
-    <q-btn class="q-mr-lg"
+    <q-btn :disable="timeLabel === startTime || isInPlayback"
+           color="primary"
+           icon="skip_previous"
+           outline
+           padding="sm"
+           @click="timeBackward">
+    </q-btn>
+    <q-slider
+      :disable="isInPlayback"
+      :label-value="formatTime(hoverTime)"
+      :max="latestTime"
+      :min="startTime"
+      :model-value="timeLabel"
+      :step="step"
+      class="q-ml-md q-mr-md col"
+      label
+      markers
+      snap
+      style="min-width: 150px;"
+      @change="val => {timeLabel = val; hoverTime = val}"
+      @update:model-value="val => {hoverTime = val}"
+    ></q-slider>
+    <q-btn :disable="timeLabel === latestTime || isInPlayback"
+           class="q-mr-sm"
+           color="primary"
+           icon="skip_next"
+           outline
+           padding="sm"
+           @click="timeForward">
+    </q-btn>
+    <q-btn :disable="isInPlayback"
+           class="q-mr-sm"
+           color="primary"
+           icon="update"
+           padding="sm"
+           round
+           @click="$emit('refresh')">
+    </q-btn>
+    <q-btn-toggle
+      v-model="selectedTime"
+      :options="timeOptions">
+    </q-btn-toggle>
+
+    <q-btn-toggle
+      v-if="genericStore.debuggingEnabled"
+      v-model="selectedResolution"
+      :options="resolutionOptions"
+      class="q-ml-md">
+    </q-btn-toggle>
+
+    <q-btn class="q-mr-md q-ml-md"
            color="primary"
            icon="speed"
-           outline>
-      <q-tooltip :offset="[0, 20]" anchor="top middle"
-                 class="text-bold" self="center middle"
-                 transition-duration="0">
-        Animation Speed
-      </q-tooltip>
+           outline
+           padding="sm">
       <q-menu auto-close>
         <q-list style="min-width: 200px;">
           <q-item v-for="i in playbackSpeedList" :key="i.id"
@@ -105,82 +87,63 @@
         </q-list>
       </q-menu>
     </q-btn>
-    <div>
-      <q-btn :disable="!torrentialRainAvailable"
-             :outline="!displayTorrentialRain"
-             class="q-mr-sm"
-             color="primary"
-             icon="fa-solid fa-cloud-showers-heavy"
-             @click="displayTorrentialRain = !displayTorrentialRain">
-        <q-tooltip :offset="[0, 20]" anchor="top middle"
-                   class="text-bold" self="center middle"
-                   transition-duration="0">
-          Localized Torrential Rain
-        </q-tooltip>
-      </q-btn>
-      <q-btn :disable="!gpvAvailable"
-             :outline="!displayGpv"
-             class="q-mr-sm"
-             color="primary"
-             icon="fa-solid fa-table-cells"
-             @click="displayGpv = !displayGpv">
-        <q-tooltip :offset="[0, 20]" anchor="top middle"
-                   class="text-bold" self="center middle"
-                   transition-duration="0">
-          GPV
-        </q-tooltip>
-      </q-btn>
-      <q-btn-dropdown :disable="!rainMeasurementsAvailable"
-                      :outline="!displayRainMeasurements"
-                      class="q-mr-xl"
-                      color="primary"
-                      icon="fa-solid fa-droplet"
-                      split
-                      @click="displayRainMeasurements = !displayRainMeasurements">
-        <template v-slot:label>
-          <q-tooltip :offset="[0, 20]" anchor="top middle"
-                     class="text-bold" self="center middle"
-                     transition-duration="0">
-            {{ precipitationStore.selectedDuration.replace('h', '') }}-hr. precipitation
-          </q-tooltip>
-        </template>
-        <q-list>
-          <q-item v-close-popup clickable @click="() => {changeRainMeasurements('3d')}">
-            <q-item-section>
-              <q-icon v-if="precipitationStore.rainMeasurementsDisplayOption === '3d'" class="q-mr-md"
-                      name="check" size="24px"></q-icon>
-            </q-item-section>
-            <q-item-section>
-              3D
-            </q-item-section>
-          </q-item>
-          <q-item v-close-popup clickable @click="() => {changeRainMeasurements('text')}">
-            <q-item-section>
-              <q-icon v-if="precipitationStore.rainMeasurementsDisplayOption === 'text'" class="q-mr-md"
-                      name="check" size="24px"></q-icon>
-            </q-item-section>
-            <q-item-section>
-              Text
-            </q-item-section>
-          </q-item>
-        </q-list>
-      </q-btn-dropdown>
-    </div>
+    <q-btn :disable="!torrentialRainAvailable"
+           :outline="!displayTorrentialRain"
+           class="q-mr-sm"
+           color="primary"
+           icon="fa-solid fa-cloud-showers-heavy"
+           padding="sm"
+           @click="displayTorrentialRain = !displayTorrentialRain">
+    </q-btn>
+    <q-btn :disable="!gpvAvailable"
+           :outline="!displayGpv"
+           class="q-mr-sm"
+           color="primary"
+           icon="fa-solid fa-table-cells"
+           padding="sm"
+           @click="displayGpv = !displayGpv">
+    </q-btn>
+    <q-btn-dropdown :disable="!rainMeasurementsAvailable"
+                    :outline="!displayRainMeasurements"
+                    class="q-mr-xl"
+                    color="primary"
+                    icon="fa-solid fa-droplet"
+                    padding="sm"
+                    split
+                    @click="displayRainMeasurements = !displayRainMeasurements">
+      <q-list>
+        <q-item v-close-popup clickable @click="() => {changeRainMeasurements('3d')}">
+          <q-item-section>
+            <q-icon v-if="precipitationStore.rainMeasurementsDisplayOption === '3d'" class="q-mr-md"
+                    name="check" size="24px"></q-icon>
+          </q-item-section>
+          <q-item-section>
+            3D
+          </q-item-section>
+        </q-item>
+        <q-item v-close-popup clickable @click="() => {changeRainMeasurements('text')}">
+          <q-item-section>
+            <q-icon v-if="precipitationStore.rainMeasurementsDisplayOption === 'text'" class="q-mr-md"
+                    name="check" size="24px"></q-icon>
+          </q-item-section>
+          <q-item-section>
+            Text
+          </q-item-section>
+        </q-item>
+      </q-list>
+    </q-btn-dropdown>
   </q-toolbar>
 </template>
 
 <script lang="ts">
-import {computed, defineComponent, onBeforeUnmount, onMounted, onUnmounted, ref, Ref, shallowRef, watch} from 'vue';
+import {computed, defineComponent, onBeforeUnmount, onMounted, onUnmounted, ref, Ref, watch} from 'vue';
 import {usePrecipitationStore} from 'stores/precipitation';
 import {setInterval} from 'timers';
-import noUiSlider, {PipsMode} from 'nouislider';
-import 'nouislider/dist/nouislider.min.css';
 import {useGenericStore} from 'stores/generic';
 
 export default defineComponent({
   emits: ['refresh'],
   setup(_, {emit}) {
-    const slider = shallowRef();
     const genericStore = useGenericStore();
     const precipitationStore = usePrecipitationStore();
 
@@ -188,16 +151,10 @@ export default defineComponent({
     function hotKeyHandler(e: KeyboardEvent) {
       if (e.ctrlKey && e.key === 'ArrowLeft') {
         e.preventDefault()
-        if (!isInPlayback.value) {
-          // disable in playback
-          timeBackward()
-        }
+        timeBackward()
       } else if (e.ctrlKey && e.key === 'ArrowRight') {
         e.preventDefault()
-        if (!isInPlayback.value) {
-          // disable in playback
-          timeForward()
-        }
+        timeForward()
       } else if (e.ctrlKey && e.key === 'Enter') {
         e.preventDefault()
         if (isInPlayback.value) {
@@ -229,6 +186,7 @@ export default defineComponent({
     });
 
     // Time
+    const hoverTime = ref(precipitationStore.currentTime);
     const startTime = computed(() => precipitationStore.startTime);
     const step = computed(() => precipitationStore.step);
     const latestTime = computed(() => precipitationStore.endTime);
@@ -269,56 +227,14 @@ export default defineComponent({
       return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`
     }
 
-    function formatTimeBack(time: string): number {
-      return parseInt(time);
-    }
-
-
-    // Slider
-    const sliderInitialized = ref(false);
-    watch(computed(() => {
-      return precipitationStore.initialized
-    }), () => {
-      noUiSlider.create(slider.value, {
-        start: latestTime.value,
-        keyboardSupport: false,
-        range: {
-          min: startTime.value,
-          max: latestTime.value
-        },
-        pips: {
-          mode: PipsMode.Count,
-          values: 7,
-          density: 3,
-          stepped: true,
-          format: {
-            to: formatTime,
-            from: formatTimeBack
-          }
-        },
-        tooltips: {
-          to: formatTime,
-          from: formatTimeBack
-        },
-        step: step.value,
-        format: {
-          to: (val) => {
-            return val
-          },
-          from: formatTimeBack
-        }
-      })
-      slider.value.noUiSlider.on('change', (values: number[]) => {
-        timeLabel.value = values[0];
-      })
-      sliderInitialized.value = true;
-    })
-    watch(timeLabel, () => {
-      if (!sliderInitialized.value) {
-        return
+    function labelTime(time: number): string {
+      if ((latestTime.value - time) % 3600 === 0) {
+        const date = new Date(time * 1000);
+        return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`
+      } else {
+        return ' ';
       }
-      slider.value.noUiSlider.set(timeLabel.value);
-    })
+    }
 
     // Playback
     const playbackSpeed: Ref<number> = ref(3);
@@ -374,14 +290,6 @@ export default defineComponent({
       }
     });
 
-    watch(isInPlayback, () => {
-      if (isInPlayback.value) {
-        slider.value.noUiSlider.disable();
-      } else {
-        slider.value.noUiSlider.enable();
-      }
-    })
-
     onUnmounted(() => {
       endPlayback()
     })
@@ -425,17 +333,15 @@ export default defineComponent({
 
     return {
       // Store
-      precipitationStore,
       genericStore,
-
-      // Slider
-      slider,
+      precipitationStore,
 
       // Resolution
       resolutionOptions,
       selectedResolution,
 
       // Time
+      hoverTime,
       startTime,
       step,
       latestTime,
@@ -444,6 +350,10 @@ export default defineComponent({
       timeLabel,
       timeBackward,
       timeForward,
+      formatTime,
+
+      // Label
+      labelTime,
 
       // Playback
       playbackSpeed,
@@ -468,23 +378,3 @@ export default defineComponent({
   }
 });
 </script>
-
-<!--suppress CssUnusedSymbol -->
-<style>
-.noUi-horizontal .noUi-handle {
-  border-radius: 12px;
-  box-shadow: 0 3px 1px -2px rgba(0, 0, 0, .2), 0 2px 2px 0 rgba(0, 0, 0, .14), 0 1px 5px 0 rgba(0, 0, 0, .12);
-  height: 24px;
-  width: 24px;
-  top: -5px;
-  right: -12px;
-}
-
-.noUi-handle:before, .noUi-handle:after {
-  background: none;
-}
-
-.noUi-tooltip {
-  padding: 0 4px 0 4px;
-}
-</style>

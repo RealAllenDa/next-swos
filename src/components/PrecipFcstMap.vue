@@ -1,9 +1,20 @@
 <template>
   <div id="map" ref="mapContainer">
     <MapControl ref="legendRain">
-      <div class="q-pr-sm q-pl-sm q-pt-sm q-pb-sm legend-rain">
+      <q-btn v-if="!isDesktopLayout"
+             color="primary"
+             icon="style"
+             padding="xs"
+             @click="showLegend = true">
+      </q-btn>
+      <div v-if="isDesktopLayout" class="q-pr-sm q-pl-sm q-pt-sm q-pb-sm legend-rain">
         <PrecipFcstLegend></PrecipFcstLegend>
       </div>
+      <q-dialog v-model="showLegend">
+        <div class="legend-rain legend-rain-dialog">
+          <PrecipFcstLegend></PrecipFcstLegend>
+        </div>
+      </q-dialog>
     </MapControl>
     <MapControl ref="legendDescription">
       <div v-if="precipitationStore.initialized" class="q-pr-sm q-pl-sm q-pt-sm q-pb-sm legend-description column">
@@ -20,7 +31,7 @@
           <span>{{ precipitationStore.currentTimeFormatted }}</span>
         </div>
         <div v-if="precipitationStore.displayRainMeasurements && isLastTime" class="legend-description-sub row">
-          <span>1小时站点观测</span>
+          <span>{{ precipitationStore.selectedDuration.replace('h', '') }}小时站点观测</span>
           <span>{{ precipitationStore.rainMeasurementsTime }}</span>
         </div>
       </div>
@@ -35,14 +46,22 @@ import sdk from 'src/composables/sdk';
 import type {Feature, FeatureCollection} from '@turf/turf'
 import * as turf from '@turf/turf'
 import {round} from '@turf/turf'
-import {FullscreenControl, Map, NavigationControl, ScaleControl} from 'maplibre-gl';
+import {FullscreenControl, Map, NavigationControl, Popup, ScaleControl} from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import MapControl from 'components/MLMapControl.vue';
 import PrecipFcstLegend from 'components/PrecipFcstLegend.vue';
+import {useGenericStore} from 'stores/generic';
+import {format} from 'date-fns';
+import html2canvas from 'html2canvas';
+import {useQuasar} from 'quasar';
 
 export default defineComponent({
   components: {MapControl, PrecipFcstLegend},
   setup() {
+    const isDesktopLayout = computed(() => {
+      return useQuasar().screen.gt.sm;
+    });
+    const genericStore = useGenericStore();
     const precipitationStore = usePrecipitationStore();
     const map = shallowRef<Map>();
     const mapContainer = shallowRef<HTMLElement>();
@@ -61,6 +80,7 @@ export default defineComponent({
     const rainMeasurementsDisplay = computed(() => precipitationStore.displayRainMeasurements);
     const isLastTime = computed(() => precipitationStore.endTime === precipitationStore.currentTime);
 
+    const showLegend = ref(false);
     const legendRain = ref<typeof MapControl>();
     const legendDescription = ref<typeof MapControl>();
 
@@ -72,9 +92,7 @@ export default defineComponent({
     function refreshTorrentialRain() {
       if (!torrentialRainDisplay.value) {
         if (torrentialRainLayerInitialized.value) {
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore
-          map.value?.getSource('torrential-rain')?.setData({'type': 'FeatureCollection', 'features': []});
+          map.value?.setLayoutProperty('torrential-rain', 'visibility', 'none');
         }
         return
       }
@@ -134,6 +152,7 @@ export default defineComponent({
           })
           torrentialRainLayerInitialized.value = true;
         } else {
+          map.value?.setLayoutProperty('torrential-rain', 'visibility', 'visible');
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-ignore
           map.value?.getSource('torrential-rain')?.setData(dataCollection);
@@ -145,9 +164,7 @@ export default defineComponent({
     function refreshGpv() {
       if (!gpvDisplay.value) {
         if (gpvLayerInitialized.value) {
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore
-          map.value?.getSource('gpv')?.setData({'type': 'FeatureCollection', 'features': []});
+          map.value?.setLayoutProperty('gpv', 'visibility', 'none');
         }
         return
       }
@@ -178,50 +195,107 @@ export default defineComponent({
         })
         gpvLayerInitialized.value = true;
       } else {
+        map.value?.setLayoutProperty('gpv', 'visibility', 'visible');
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         map.value?.getSource('gpv')?.setData(`${sdk.apiUrl}/parse/rain/gpv_${precipitationStore.selectedDuration}_5km_${currentData.value?.time}.geojson`)
       }
     }
 
+    function setRainMeasurementsVisibility() {
+      map.value?.setLayoutProperty('rain-measurements-point', 'visibility', 'visible');
+      if (precipitationStore.rainMeasurementsDisplayOption === '3d') {
+        map.value?.setLayoutProperty('rain-measurements-3d', 'visibility', 'visible');
+        map.value?.setLayoutProperty('rain-measurements-label', 'visibility', 'none');
+      } else if (precipitationStore.rainMeasurementsDisplayOption === 'text') {
+        map.value?.setLayoutProperty('rain-measurements-3d', 'visibility', 'none');
+        map.value?.setLayoutProperty('rain-measurements-label', 'visibility', 'visible');
+      } else {
+        throw new Error(`NOT IMPLEMENTED: ${precipitationStore.rainMeasurementsDisplayOption} option`)
+      }
+    }
+
+    function getRainMeasurementsColor(precipitation: number) {
+      let color;
+      if (precipitationStore.selectedDuration === '1h') {
+        if (1 < precipitation && precipitation < 3) {
+          color = '#F2F2FF'
+        } else if (3 <= precipitation && precipitation < 5) {
+          color = '#A0D2FF'
+        } else if (5 <= precipitation && precipitation < 10) {
+          color = '#218CFF'
+        } else if (10 <= precipitation && precipitation < 20) {
+          color = '#0041FF'
+        } else if (20 <= precipitation && precipitation < 30) {
+          color = '#FFF500'
+        } else if (30 <= precipitation && precipitation < 40) {
+          color = '#FF9900'
+        } else if (40 <= precipitation && precipitation < 50) {
+          color = '#FF2800'
+        } else if (50 <= precipitation) {
+          color = '#B40068'
+        } else {
+          color = '#FFFFFF'
+        }
+      } else if (precipitationStore.selectedDuration === '3h') {
+        throw new Error('NOT IMPLEMENTED: color for 3h')
+      } else if (precipitationStore.selectedDuration === '24h') {
+        if (1 < precipitation && precipitation < 25) {
+          color = '#F2F2FF'
+        } else if (25 <= precipitation && precipitation < 50) {
+          color = '#A0D2FF'
+        } else if (50 <= precipitation && precipitation < 80) {
+          color = '#218CFF'
+        } else if (80 <= precipitation && precipitation < 100) {
+          color = '#0041FF'
+        } else if (100 <= precipitation && precipitation < 150) {
+          color = '#FFF500'
+        } else if (150 <= precipitation && precipitation < 200) {
+          color = '#FF9900'
+        } else if (200 <= precipitation && precipitation < 250) {
+          color = '#FF2800'
+        } else if (250 <= precipitation) {
+          color = '#B40068'
+        } else {
+          color = '#FFFFFF'
+        }
+      } else {
+        throw new Error(`NOT IMPLEMENTED: color for ${precipitationStore.selectedDuration}`)
+      }
+      return color;
+    }
+
     function refreshRainMeasurements() {
-      let dataCollection: FeatureCollection = {type: 'FeatureCollection', features: []}
       if (!isLastTime.value || !rainMeasurementsDisplay.value) {
         if (rainMeasurementsLayerInitialized.value) {
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore
-          map.value?.getSource('rain-measurements')?.setData(dataCollection);
+          map.value?.setLayoutProperty('rain-measurements-3d', 'visibility', 'none');
+          map.value?.setLayoutProperty('rain-measurements-label', 'visibility', 'none');
+          map.value?.setLayoutProperty('rain-measurements-point', 'visibility', 'none');
         }
         return
       }
-      const {data: rain} = sdk.useFetch<RainMeasurements>('https://api.daziannetwork.com/warning/rain_state_1h', true);
+      let rain_url;
+      if (precipitationStore.selectedDuration === '1h') {
+        rain_url = 'https://api.daziannetwork.com/warning/rain_state_1h';
+      } else if (precipitationStore.selectedDuration === '24h') {
+        rain_url = 'https://api.daziannetwork.com/warning/rain_state';
+      } else if (precipitationStore.selectedDuration === '3h') {
+        console.warn('NOT IMPLEMENTED: 3h rain measurements')
+        return;
+      } else {
+        throw new Error('Exhaustive handling of rainMeasurements');
+      }
+      let dataCollection: FeatureCollection = {type: 'FeatureCollection', features: []}
+      let dataCollectionSquare: FeatureCollection = {type: 'FeatureCollection', features: []}
+      const {data: rain} = sdk.useFetch<RainMeasurements>(rain_url, true);
       watch(rain, () => {
         if (rain.value === undefined || rain.value === null) {
           sdk.showNotification('negative', 'Failed to fetch 1-hr. precipitation data');
           return;
         }
         rain.value.rain.forEach(station => {
-          let color;
           const precipitation = station.value;
-          if (1 < precipitation && precipitation < 3) {
-            color = '#F2F2FF'
-          } else if (3 <= precipitation && precipitation < 5) {
-            color = '#A0D2FF'
-          } else if (5 <= precipitation && precipitation < 10) {
-            color = '#218CFF'
-          } else if (10 <= precipitation && precipitation < 20) {
-            color = '#0041FF'
-          } else if (20 <= precipitation && precipitation < 30) {
-            color = '#FFF500'
-          } else if (30 <= precipitation && precipitation < 40) {
-            color = '#FF9900'
-          } else if (40 <= precipitation && precipitation < 50) {
-            color = '#FF2800'
-          } else if (50 <= precipitation) {
-            color = '#B40068'
-          } else {
-            color = '#FFFFFF'
-          }
+          const color = getRainMeasurementsColor(precipitation);
           dataCollection.features.push({
             type: 'Feature',
             geometry: {
@@ -233,6 +307,21 @@ export default defineComponent({
               color: color
             }
           })
+          let value = precipitation * 1000;
+          if (value > 0) {
+            dataCollectionSquare.features.push(
+              turf.bboxPolygon(
+                turf.bbox(turf.circle([station.longitude, station.latitude], 1)),
+                {
+                  properties: {
+                    name: station.name,
+                    value: value,
+                    color: color
+                  }
+                }
+              )
+            )
+          }
         })
         precipitationStore.rainMeasurementsTime = rain.value.message_time
 
@@ -240,6 +329,10 @@ export default defineComponent({
           map.value?.addSource('rain-measurements', {
             type: 'geojson',
             data: dataCollection
+          })
+          map.value?.addSource('rain-measurements-square', {
+            type: 'geojson',
+            data: dataCollectionSquare
           })
           // Layer for displaying numbers
           map.value?.addLayer({
@@ -250,13 +343,27 @@ export default defineComponent({
             layout: {
               'text-allow-overlap': true,
               'text-font': ['Roboto Bold'],
+              'text-size': 20,
               'text-field': ['get', 'value']
             },
             paint: {
               'text-color': ['get', 'color'],
-              'text-halo-color': '#000',
-              'text-halo-width': 3,
+              'text-halo-color': '#707070',
+              'text-halo-width': 1,
               'text-halo-blur': 1
+            }
+          })
+          // Layer for displaying 3d maps
+          map.value?.addLayer({
+            id: 'rain-measurements-3d',
+            type: 'fill-extrusion',
+            source: 'rain-measurements-square',
+            minzoom: 8,
+            paint: {
+              'fill-extrusion-color': ['get', 'color'],
+              'fill-extrusion-height': ['get', 'value'],
+              'fill-extrusion-base': 0,
+              'fill-extrusion-opacity': 0.85
             }
           })
           // Layer for displaying points
@@ -273,12 +380,37 @@ export default defineComponent({
               'circle-stroke-color': '#000'
             }
           })
+          const popup = new Popup({
+            closeButton: false,
+            closeOnClick: false,
+            maxWidth: 'none',
+            className: 'rain-measurements-popup'
+          });
+          map.value?.on('mousemove', 'rain-measurements-3d', (e) => {
+            // Change the cursor style as a UI indicator.
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            map.value!.getCanvas().style.cursor = 'pointer';
+            popup
+              .setLngLat(e.lngLat)
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+              .setHTML(`${e.features![0].properties.name}: ${e.features![0].properties.value / 1000}mm`)
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+              .addTo(map.value!);
+          })
+          map.value?.on('mouseleave', 'rain-measurements-3d', () => {
+            popup.remove()
+          })
           rainMeasurementsLayerInitialized.value = true;
         } else {
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-ignore
           map.value?.getSource('rain-measurements')?.setData(dataCollection);
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          map.value?.getSource('rain-measurements-square')?.setData(dataCollectionSquare);
         }
+
+        setRainMeasurementsVisibility();
       })
     }
 
@@ -335,14 +467,34 @@ export default defineComponent({
 
     watch(torrentialRainDisplay, refreshTorrentialRain);
     watch(gpvDisplay, refreshGpv)
-    watch(rainMeasurementsDisplay, refreshRainMeasurements)
+    watch(rainMeasurementsDisplay, refreshRainMeasurements);
+    watch(computed(() => {
+      return precipitationStore.rainMeasurementsDisplayOption
+    }), setRainMeasurementsVisibility)
+
+    watch(computed(() => {
+      return genericStore.screenshot
+    }), async () => {
+      if (genericStore.screenshot) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        const pngImage = (await html2canvas(mapContainer.value!, {
+          backgroundColor: '#FFFF00'
+        })).toDataURL();
+        const anchor = document.createElement('a')
+        anchor.setAttribute('href', pngImage)
+        anchor.setAttribute('download',
+          `SWoS_PrecipForecast_${format(new Date(), 'yyyy_mm_dd_HH_mm_ss')}.png`)
+        anchor.click()
+        genericStore.screenshot = false;
+      }
+    })
 
     onMounted(() => {
       map.value = markRaw(new Map({
         container: 'map',
-        pitchWithRotate: false,
-        dragRotate: false,
-        touchPitch: false,
+        // pitchWithRotate: false,
+        // dragRotate: false,
+        // touchPitch: false,
         keyboard: false,
         preserveDrawingBuffer: true,
         style: {
@@ -384,7 +536,7 @@ export default defineComponent({
       map.value.addControl(new legendDescription.value!.MapLegend(), 'top-right')
 
       map.value.addControl(new FullscreenControl(), 'top-left');
-      map.value.addControl(new NavigationControl({showCompass: false}), 'top-left');
+      map.value.addControl(new NavigationControl(), 'top-left');
       map.value.addControl(new ScaleControl({unit: 'metric'}), 'bottom-left');
 
       map.value.on('sourcedata', (e) => {
@@ -395,8 +547,10 @@ export default defineComponent({
     });
 
     return {
+      isDesktopLayout,
       map,
       mapContainer,
+      showLegend,
       legendRain,
       legendDescription,
       currentData,
@@ -431,6 +585,11 @@ export default defineComponent({
   margin: 0 10px 10px 0;
 }
 
+.legend-rain-dialog {
+  padding: 10px;
+  margin: 0;
+}
+
 .legend-description {
   background: white;
   border: 2px solid rgba(0, 0, 0, 0.2);
@@ -443,5 +602,10 @@ export default defineComponent({
 .legend-description-sub {
   font-size: 14px;
   justify-content: space-between;
+}
+
+.rain-measurements-popup {
+  font-size: 20px !important;
+  padding: 5px !important;
 }
 </style>

@@ -13,6 +13,7 @@ import TyphoonMapSettings from 'src/components/TyphoonMapSettings.vue';
 import sdk from 'src/composables/sdk';
 import {useTyphoonStore} from 'stores/typhoon';
 import PageLoading from 'components/PageLoading.vue';
+import {useGenericStore} from 'stores/generic';
 
 export default defineComponent({
   name: 'TyphoonPage',
@@ -62,6 +63,7 @@ export default defineComponent({
       initTyphoonList();
     });
 
+    useGenericStore().initPageSpec(false, false, false)
     onUnmounted(() => {
       typhoonStore.$dispose()
     })

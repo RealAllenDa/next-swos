@@ -26,6 +26,7 @@ export const usePrecipitationStore = defineStore('precipitation', {
     rainMeasurementsAvailable: false,
     rainMeasurementsTime: '',
 
+
     legendOptions: undefined as LegendOptions | undefined,
     mapOptions: {} as { [name: string]: MapInterface },
     mapIsLoading: false,
@@ -37,7 +38,8 @@ export const usePrecipitationStore = defineStore('precipitation', {
     resolutionOptions: [
       {label: '1KM', value: '1km'},
       {label: '5KM', value: '5km'}
-    ]
+    ],
+    rainMeasurementsDisplayOption: '3d'
   }),
   getters: {
     mapId: (state) => {
@@ -63,16 +65,21 @@ export const usePrecipitationStore = defineStore('precipitation', {
       this.selectedDuration = this.spec.default.duration;
       this.mapOptions = this.spec.maps;
     },
-    setOptions(resolution: string | undefined, duration: string | undefined, torrential: boolean | undefined) {
-      console.log(resolution, duration, torrential)
+    setOptions(resolution: string | undefined, duration: string | undefined, torrential: boolean | undefined, gpv: boolean | undefined, station: boolean | undefined) {
       if (resolution !== undefined) {
         this.selectedResolution = resolution;
       }
       if (duration !== undefined) {
         this.selectedDuration = duration;
       }
-      if (torrential !== undefined) {
+      if (torrential !== undefined && this.torrentialRainAvailable) {
         this.displayTorrentialRain = torrential;
+      }
+      if (gpv !== undefined && this.gpvAvailable) {
+        this.displayGpv = gpv;
+      }
+      if (station !== undefined && this.rainMeasurementsAvailable) {
+        this.displayRainMeasurements = station;
       }
     },
 

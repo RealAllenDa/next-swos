@@ -353,6 +353,10 @@ export default defineComponent({
         const currentTyphoonPoint = currentTyphoons.value[i].points[
         currentTyphoons.value[i].points.length - (currentTyphoonIndex.value + 1)
           ];
+        // noinspection JSIncompatibleTypesComparison
+        if (currentTyphoonPoint === undefined) {
+          break;
+        }
         drawStrength(
           currentTyphoonPoint.radius7_quad,
           [parseFloat(currentTyphoonPoint.latitude), parseFloat(currentTyphoonPoint.longitude)],
