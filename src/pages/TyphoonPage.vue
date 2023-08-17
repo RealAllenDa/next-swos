@@ -7,7 +7,7 @@
 </template>
 
 <script lang="ts">
-import {computed, defineComponent, onUnmounted, ref, Ref, watch} from 'vue';
+import {computed, defineComponent, onMounted, onUnmounted, ref, Ref, watch} from 'vue';
 import TyphoonMap from 'src/components/TyphoonMap.vue';
 import TyphoonMapSettings from 'src/components/TyphoonMapSettings.vue';
 import sdk from 'src/composables/sdk';
@@ -63,7 +63,10 @@ export default defineComponent({
       initTyphoonList();
     });
 
-    useGenericStore().initPageSpec(false, false, false)
+    onMounted(() => {
+      typhoonStore.$reset()
+      useGenericStore().initPageSpec(false, false, false)
+    })
     onUnmounted(() => {
       typhoonStore.$dispose()
     })

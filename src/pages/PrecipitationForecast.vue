@@ -15,7 +15,7 @@
 </template>
 
 <script lang="ts">
-import {computed, defineComponent, onUnmounted, watch} from 'vue';
+import {computed, defineComponent, onMounted, onUnmounted, watch} from 'vue';
 import MapSettings from 'components/PrecipFcstMapSettings.vue';
 import PrecipitationMap from 'components/PrecipFcstMap.vue';
 import {usePrecipitationStore} from 'stores/precipitation';
@@ -74,9 +74,12 @@ export default defineComponent({
       })
     }
 
-    initPrecipitation()
     useGenericStore().initPageSpec(true, true, true)
 
+    onMounted(() => {
+      precipitationStore.$reset()
+      initPrecipitation()
+    })
     onUnmounted(() => {
       precipitationStore.$dispose()
     })

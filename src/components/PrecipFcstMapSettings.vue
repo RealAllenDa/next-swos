@@ -275,10 +275,16 @@ export default defineComponent({
 
 
     // Slider
-    const sliderInitialized = ref(false);
-    watch(computed(() => {
-      return precipitationStore.initialized
-    }), () => {
+    function initializeSlider(ignoreReinitialization = false) {
+      if (sliderInitialized.value && !ignoreReinitialization) {
+        throw new Error('re-initialization of slider');
+      }
+      if (!precipitationStore.initialized) {
+        // This is expected behavior. When a user navigates to another page then re-navigates
+        // back to this page, we dispose & reset the precipitation store.
+        // So, there is a chance that it is called before initialization takes place.
+        return
+      }
       noUiSlider.create(slider.value, {
         start: latestTime.value,
         keyboardSupport: false,
@@ -312,12 +318,30 @@ export default defineComponent({
         timeLabel.value = values[0];
       })
       sliderInitialized.value = true;
-    })
+    }
+
+    const sliderInitialized = ref(false);
+    watch(computed(() => {
+      return precipitationStore.initialized
+    }), initializeSlider)
     watch(timeLabel, () => {
       if (!sliderInitialized.value) {
         return
       }
       slider.value.noUiSlider.set(timeLabel.value);
+    })
+    watch(latestTime, () => {
+      if (!sliderInitialized.value) {
+        return;
+      }
+      slider.value.noUiSlider.updateOptions({
+        start: latestTime.value,
+        range: {
+          min: startTime.value,
+          max: latestTime.value
+        },
+        step: step.value
+      }, false)
     })
 
     // Playback
@@ -384,6 +408,7 @@ export default defineComponent({
 
     onUnmounted(() => {
       endPlayback()
+      sliderInitialized.value = false;
     })
 
     // Torrential Rain

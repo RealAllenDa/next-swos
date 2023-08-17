@@ -6,7 +6,7 @@
 </template>
 
 <script lang="ts">
-import {defineComponent, onUnmounted, ref, Ref, watch} from 'vue';
+import {defineComponent, onMounted, onUnmounted, ref, Ref, watch} from 'vue';
 import WeatherWarningMap from 'components/WeatherWarningMap.vue';
 import sdk from 'src/composables/sdk';
 import {useWeatherWarningStore} from 'stores/weather-warning';
@@ -32,7 +32,10 @@ export default defineComponent({
       }
     });
 
-    useGenericStore().initPageSpec(false, false, false)
+    onMounted(() => {
+      weatherWarningStore.$reset()
+      useGenericStore().initPageSpec(false, false, false)
+    })
     onUnmounted(() => {
       weatherWarningStore.$dispose()
     })
