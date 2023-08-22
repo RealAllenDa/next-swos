@@ -30,7 +30,8 @@
           <span>网格雨量</span>
           <span>{{ precipitationStore.currentTimeFormatted }}</span>
         </div>
-        <div v-if="precipitationStore.displayRainMeasurements && isLastTime" class="legend-description-sub row">
+        <div v-if="precipitationStore.displayRainMeasurements && precipitationStore.rainMeasurementsSuccess"
+             class="legend-description-sub row">
           <span>{{ precipitationStore.selectedDuration.replace('h', '') }}小时站点观测</span>
           <span>{{ precipitationStore.rainMeasurementsTime }}</span>
         </div>
@@ -202,7 +203,13 @@ export default defineComponent({
       }
     }
 
-    function setRainMeasurementsVisibility() {
+    function setRainMeasurementsVisibility(visible = true) {
+      if (!visible) {
+        map.value?.setLayoutProperty('rain-measurements-3d', 'visibility', 'none');
+        map.value?.setLayoutProperty('rain-measurements-label', 'visibility', 'none');
+        map.value?.setLayoutProperty('rain-measurements-point', 'visibility', 'none');
+        return
+      }
       map.value?.setLayoutProperty('rain-measurements-point', 'visibility', 'visible');
       if (precipitationStore.rainMeasurementsDisplayOption === '3d') {
         map.value?.setLayoutProperty('rain-measurements-3d', 'visibility', 'visible');
@@ -238,7 +245,25 @@ export default defineComponent({
           color = '#FFFFFF'
         }
       } else if (precipitationStore.selectedDuration === '3h') {
-        throw new Error('NOT IMPLEMENTED: color for 3h')
+        if (1 < precipitation && precipitation < 10) {
+          color = '#F2F2FF'
+        } else if (10 <= precipitation && precipitation < 30) {
+          color = '#A0D2FF'
+        } else if (30 <= precipitation && precipitation < 40) {
+          color = '#218CFF'
+        } else if (40 <= precipitation && precipitation < 50) {
+          color = '#0041FF'
+        } else if (50 <= precipitation && precipitation < 60) {
+          color = '#FFF500'
+        } else if (60 <= precipitation && precipitation < 80) {
+          color = '#FF9900'
+        } else if (80 <= precipitation && precipitation < 100) {
+          color = '#FF2800'
+        } else if (100 <= precipitation) {
+          color = '#B40068'
+        } else {
+          color = '#FFFFFF'
+        }
       } else if (precipitationStore.selectedDuration === '24h') {
         if (1 < precipitation && precipitation < 25) {
           color = '#F2F2FF'
@@ -266,22 +291,20 @@ export default defineComponent({
     }
 
     function refreshRainMeasurements() {
-      if (!isLastTime.value || !rainMeasurementsDisplay.value) {
+      if (!rainMeasurementsDisplay.value) {
         if (rainMeasurementsLayerInitialized.value) {
-          map.value?.setLayoutProperty('rain-measurements-3d', 'visibility', 'none');
-          map.value?.setLayoutProperty('rain-measurements-label', 'visibility', 'none');
-          map.value?.setLayoutProperty('rain-measurements-point', 'visibility', 'none');
+          precipitationStore.rainMeasurementsSuccess = false;
+          setRainMeasurementsVisibility(false);
         }
         return
       }
       let rain_url;
       if (precipitationStore.selectedDuration === '1h') {
-        rain_url = 'https://api.daziannetwork.com/warning/rain_state_1h';
+        rain_url = `https://db.api.daziannetwork.com/rain_state?hours=1&end_time=${precipitationStore.currentTimeFormatted}`;
       } else if (precipitationStore.selectedDuration === '24h') {
-        rain_url = 'https://api.daziannetwork.com/warning/rain_state';
+        rain_url = `https://db.api.daziannetwork.com/rain_state?hours=24&end_time=${precipitationStore.currentTimeFormatted}`;
       } else if (precipitationStore.selectedDuration === '3h') {
-        console.warn('NOT IMPLEMENTED: 3h rain measurements')
-        return;
+        rain_url = `https://db.api.daziannetwork.com/rain_state?hours=3&end_time=${precipitationStore.currentTimeFormatted}`;
       } else {
         throw new Error('Exhaustive handling of rainMeasurements');
       }
@@ -290,7 +313,8 @@ export default defineComponent({
       const {data: rain} = sdk.useFetch<RainMeasurements>(rain_url, true);
       watch(rain, () => {
         if (rain.value === undefined || rain.value === null) {
-          sdk.showNotification('negative', 'Failed to fetch 1-hr. precipitation data');
+          setRainMeasurementsVisibility(false);
+          precipitationStore.rainMeasurementsSuccess = false;
           return;
         }
         rain.value.rain.forEach(station => {
@@ -323,7 +347,9 @@ export default defineComponent({
             )
           }
         })
-        precipitationStore.rainMeasurementsTime = rain.value.message_time
+        // Time: yyyy-MM-ddTH:mm:ss+08:00 => yyyy-MM-dd HH:mm
+        const time = Date.parse(rain.value.message_time)
+        precipitationStore.rainMeasurementsTime = format(time, 'yyyy-MM-dd HH:mm');
 
         if (!rainMeasurementsLayerInitialized.value) {
           map.value?.addSource('rain-measurements', {
@@ -410,6 +436,7 @@ export default defineComponent({
           map.value?.getSource('rain-measurements-square')?.setData(dataCollectionSquare);
         }
 
+        precipitationStore.rainMeasurementsSuccess = true;
         setRainMeasurementsVisibility();
       })
     }
