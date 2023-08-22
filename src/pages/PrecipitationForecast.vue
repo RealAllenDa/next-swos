@@ -68,7 +68,9 @@ export default defineComponent({
           sdk.showNotification('negative', 'Failed to refresh: data is null or undefined.')
         } else {
           precipitationStore.setList(data.value, mutationType);
-          precipitationStore.setOptions(<string>routeResolution.value, <string>routeDuration.value, routeTorrential.value, routeGpv.value, routeStation.value);
+          if (mutationType !== 'refresh') {
+            precipitationStore.setOptions(<string>routeResolution.value, <string>routeDuration.value, routeTorrential.value, routeGpv.value, routeStation.value);
+          }
           initialized.value = true;
         }
       })
