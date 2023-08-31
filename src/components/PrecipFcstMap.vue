@@ -519,13 +519,20 @@ export default defineComponent({
       }
     }
 
+    watch(computed(() => {
+      return precipitationStore.isInPlayback
+    }), () => {
+      if (!precipitationStore.isInPlayback && precipitationStore.initialized) {
+        refreshRainLayer();
+      }
+    })
 
     watch(dataChanged, () => {
       if (!dataChanged.value) {
         return;
       }
       if (currentData.value === undefined || currentData.value === null ||
-        map.value === undefined) {
+          map.value === undefined && !precipitationStore.initialized) {
         return;
       }
       refreshRainLayer();
@@ -540,7 +547,9 @@ export default defineComponent({
     watch(rainMeasurementsDisplay, refreshRainMeasurements);
     watch(computed(() => {
       return precipitationStore.rainMeasurementsDisplayOption
-    }), setRainMeasurementsVisibility)
+    }), () => {
+      setRainMeasurementsVisibility();
+    })
 
     watch(computed(() => {
       return genericStore.screenshot
