@@ -44,7 +44,7 @@
 import {computed, defineComponent, markRaw, onMounted, ref, shallowRef, watch} from 'vue';
 import {usePrecipitationStore} from 'stores/precipitation';
 import sdk from 'src/composables/sdk';
-import type {Feature, FeatureCollection} from '@turf/turf'
+import type {FeatureCollection} from '@turf/turf'
 import * as turf from '@turf/turf'
 import {round} from '@turf/turf'
 import {FullscreenControl, Map, NavigationControl, Popup, ScaleControl} from 'maplibre-gl';
@@ -90,6 +90,54 @@ export default defineComponent({
     const rainMeasurementsLayerInitialized = ref(false);
     const gpvLayerInitialized = ref(false);
 
+    // function radians_to_degrees(radians: number) {
+    //   var pi = Math.PI;
+    //   return radians * (180 / pi);
+    // }
+
+    // function computeTorrentialRainEllipsis(feature: turf.helpers.Feature): turf.helpers.Feature | undefined {
+    //   const bbox = turf.bbox(turf.envelope(feature));
+    //   const center = turf.center(feature);
+    //
+    //   console.log(bbox);
+    //   // same lat
+    //   const xMin = turf.point([bbox[0], bbox[1]]);
+    //   const xMax = turf.point([bbox[2], bbox[1]]);
+    //   const sigmaX = new Decimal(turf.distance(xMin, xMax, {units: 'kilometers'}))
+    //
+    //   // same lng
+    //   const yMin = turf.point([bbox[0], bbox[1]]);
+    //   const yMax = turf.point([bbox[0], bbox[3]]);
+    //   const sigmaY = new Decimal(turf.distance(yMin, yMax, {units: 'kilometers'}))
+    //
+    //   const tempW = ((sigmaX.minus(sigmaY)).pow(2).plus(sigmaY.mul(sigmaX).pow(2).mul(4))).squareRoot()
+    //   const sigmaW = sigmaX.plus(sigmaY).plus(tempW).dividedBy(2)
+    //   const sigmaH = sigmaX.plus(sigmaY).minus(tempW).dividedBy(2)
+    //
+    //   const computedW = sigmaW.squareRoot().mul(2.448);
+    //   const computedH = sigmaH.squareRoot().mul(2.448);
+    //
+    //   const tanTheta = sigmaW.minus(sigmaX).dividedBy(sigmaX.mul(sigmaY))
+    //   const degTheta = tanTheta.inverseTangent();
+    //   console.log(tempW.toString(), sigmaX.toString(), sigmaY.toString(), sigmaW.toString(), sigmaH.toString(),
+    //       tanTheta.toString(), radians_to_degrees(degTheta.toNumber()))
+    //
+    //   let ratio;
+    //   if (computedW.gt(computedH)) {
+    //     ratio = computedW.dividedBy(computedH)
+    //   } else {
+    //     ratio = computedH.dividedBy(computedW)
+    //   }
+    //   console.debug('computedH', computedH.toString(), 'computedW', computedW.toString(), 'ratio', ratio.toString())
+    //   if (ratio.lte(2.5)) {
+    //     console.debug('rejected: ratio <= 2.5, not a linear precipitation zone')
+    //     // return undefined;
+    //   }
+    //   return turf.ellipse(center, computedW.toNumber(), computedH.toNumber(), {
+    //     angle: radians_to_degrees(degTheta.toNumber())
+    //   });
+    // }
+
     function refreshTorrentialRain() {
       if (!torrentialRainDisplay.value) {
         if (torrentialRainLayerInitialized.value) {
@@ -103,37 +151,24 @@ export default defineComponent({
           sdk.showNotification('negative', 'Failed to fetch torrential rain');
           return
         }
-        if (torrentialRainGeoJson.value.features.length === 0) {
-          return
-        }
+        // if (torrentialRainGeoJson.value.features.length === 0) {
+        //   return
+        // }
 
         let dataCollection: FeatureCollection = {'type': 'FeatureCollection', 'features': []}
         torrentialRainGeoJson.value.features.forEach(feature => {
-          const bbox = turf.bbox(turf.explode(turf.envelope(feature)));
-          const distanceA = Math.abs(bbox[3] - bbox[1])
-          const distanceB = Math.abs(bbox[2] - bbox[0])
-          let ratio;
-          if (distanceB > distanceA) {
-            ratio = distanceB / distanceA
-          } else {
-            ratio = distanceA / distanceB
-          }
-          console.debug('distanceA', distanceA, 'distanceB', distanceB, 'ratio', ratio)
-          if (ratio <= 2.5) {
-            console.debug('rejected: ratio <= 2.5, not a linear precipitation zone')
-            return;
-          }
-
-          const area = turf.convertArea(turf.area(turf.envelope(feature)), 'meters', 'kilometers')
+          const area = turf.convertArea(turf.area(feature), 'meters', 'kilometers')
           console.debug('area', area)
+          let areaQualified = true;
           if (area < 500) {
             console.debug('rejected: area < 500, not a linear precipitation zone')
-            return
+            areaQualified = false;
           }
 
-          dataCollection.features.push(turf.polygonSmooth(turf.envelope(feature), {
-            iterations: 5
-          }) as unknown as Feature);
+          if (areaQualified) {
+            // const result = computeTorrentialRainEllipsis(feature);
+            dataCollection.features.push(feature);
+          }
         })
         if (!torrentialRainLayerInitialized.value) {
           map.value?.addSource('torrential-rain', {
@@ -334,16 +369,16 @@ export default defineComponent({
           let value = precipitation * 1000;
           if (value > 0) {
             dataCollectionSquare.features.push(
-              turf.bboxPolygon(
-                turf.bbox(turf.circle([station.longitude, station.latitude], 1)),
-                {
-                  properties: {
-                    name: station.name,
-                    value: value,
-                    color: color
-                  }
-                }
-              )
+                turf.bboxPolygon(
+                    turf.bbox(turf.circle([station.longitude, station.latitude], 1)),
+                    {
+                      properties: {
+                        name: station.name,
+                        value: value,
+                        color: color
+                      }
+                    }
+                )
             )
           }
         })
@@ -417,11 +452,11 @@ export default defineComponent({
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             map.value!.getCanvas().style.cursor = 'pointer';
             popup
-              .setLngLat(e.lngLat)
-              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-              .setHTML(`${e.features![0].properties.name}: ${e.features![0].properties.value / 1000}mm`)
-              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-              .addTo(map.value!);
+                .setLngLat(e.lngLat)
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                .setHTML(`${e.features![0].properties.name}: ${e.features![0].properties.value / 1000}mm`)
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                .addTo(map.value!);
           })
           map.value?.on('mouseleave', 'rain-measurements-3d', () => {
             popup.remove()
@@ -510,7 +545,7 @@ export default defineComponent({
         const anchor = document.createElement('a')
         anchor.setAttribute('href', pngImage)
         anchor.setAttribute('download',
-          `SWoS_PrecipForecast_${format(new Date(), 'yyyy_mm_dd_HH_mm_ss')}.png`)
+            `SWoS_PrecipForecast_${format(new Date(), 'yyyy_mm_dd_HH_mm_ss')}.png`)
         anchor.click()
         genericStore.screenshot = false;
       }
@@ -538,7 +573,7 @@ export default defineComponent({
               ],
               'tileSize': 256,
               'attribution':
-                `&copy; ${new Date().getFullYear()} SWoS, HomeNetwork, AllenDa.<br>
+                  `&copy; ${new Date().getFullYear()} SWoS, HomeNetwork, AllenDa.<br>
         Data source: <a href="https://www.rainviewer.com/" target="_blank">RainViewer</a><br>
         Map source: GaoDe`
 
@@ -590,6 +625,7 @@ export default defineComponent({
 });
 </script>
 
+<!--suppress CssUnusedSymbol -->
 <style>
 #map {
   height: 100%;
