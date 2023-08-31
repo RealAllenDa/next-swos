@@ -208,7 +208,7 @@ export default defineComponent({
       if (!gpvLayerInitialized.value) {
         map.value?.addSource('gpv', {
           type: 'geojson',
-          buffer: 0,
+          // buffer: 0,
           tolerance: 0,
           data: `${sdk.apiUrl}/parse/rain/gpv_${precipitationStore.selectedDuration}_5km_${currentData.value?.time}.geojson`
         })
@@ -476,15 +476,23 @@ export default defineComponent({
       })
     }
 
+    function getRainUrl() {
+      let resolution = precipitationStore.selectedResolution;
+      if (precipitationStore.optInThumbnailLoading && precipitationStore.isInPlayback) {
+        resolution = precipitationStore.thumbnailQualityResolution;
+      }
+      return `${sdk.apiUrl}/parse/rain/rain_${precipitationStore.selectedDuration}_${resolution}_${currentData.value?.time}.geojson`
+    }
+
     function refreshRainLayer() {
       precipitationStore.mapIsLoading = true;
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       if (!rainLayerInitialized.value) {
         map.value?.addSource('rain', {
           type: 'geojson',
-          buffer: 0,
+          // buffer: 0,
           tolerance: 0,
-          data: `${sdk.apiUrl}/parse/rain/rain_${precipitationStore.selectedDuration}_${precipitationStore.selectedResolution}_${currentData.value?.time}.geojson`
+          data: getRainUrl()
           // type: 'vector',
           // tiles: [`http://localhost:3000/tile/${currentData.value?.time}/{z}/{x}/{y}`],
           // // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -506,7 +514,7 @@ export default defineComponent({
       } else {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
-        map.value?.getSource('rain')?.setData(`${sdk.apiUrl}/parse/rain/rain_${precipitationStore.selectedDuration}_${precipitationStore.selectedResolution}_${currentData.value?.time}.geojson`)
+        map.value?.getSource('rain')?.setData(getRainUrl())
         // map.value?.getSource('rain').setTiles([`http://localhost:3000/tile/${currentData.value?.time}/{z}/{x}/{y}`])
       }
     }
