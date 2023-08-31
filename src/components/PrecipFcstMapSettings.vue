@@ -1,24 +1,24 @@
 <template>
   <q-toolbar class="q-pl-xl q-pr-xl row q-mb-lg q-mt-lg q-pb-sm" style="flex-wrap: wrap !important;">
     <q-btn-toggle
-      v-model="selectedTime"
-      :options="timeOptions">
+        v-model="selectedTime"
+        :options="timeOptions">
     </q-btn-toggle>
 
     <q-separator
-      spaced="lg"
-      vertical></q-separator>
+        spaced="lg"
+        vertical></q-separator>
 
     <q-btn-toggle
-      v-if="genericStore.debuggingEnabled"
-      v-model="selectedResolution"
-      :options="resolutionOptions">
+        v-if="genericStore.debuggingEnabled"
+        v-model="selectedResolution"
+        :options="resolutionOptions">
     </q-btn-toggle>
 
     <q-separator
-      v-if="genericStore.debuggingEnabled"
-      spaced="lg"
-      vertical></q-separator>
+        v-if="genericStore.debuggingEnabled"
+        spaced="lg"
+        vertical></q-separator>
 
     <q-btn :disable="timeLabel === startTime || isInPlayback"
            color="primary"
@@ -170,7 +170,7 @@
 </template>
 
 <script lang="ts">
-import {computed, defineComponent, onBeforeUnmount, onMounted, onUnmounted, ref, Ref, shallowRef, watch} from 'vue';
+import {computed, defineComponent, onUnmounted, ref, Ref, shallowRef, watch} from 'vue';
 import {usePrecipitationStore} from 'stores/precipitation';
 import {setInterval} from 'timers';
 import noUiSlider, {PipsMode} from 'nouislider';
@@ -183,39 +183,6 @@ export default defineComponent({
     const slider = shallowRef();
     const genericStore = useGenericStore();
     const precipitationStore = usePrecipitationStore();
-
-    // Register Hotkeys
-    function hotKeyHandler(e: KeyboardEvent) {
-      if (e.ctrlKey && e.key === 'ArrowLeft') {
-        e.preventDefault()
-        if (!isInPlayback.value) {
-          // disable in playback
-          timeBackward()
-        }
-      } else if (e.ctrlKey && e.key === 'ArrowRight') {
-        e.preventDefault()
-        if (!isInPlayback.value) {
-          // disable in playback
-          timeForward()
-        }
-      } else if (e.ctrlKey && e.key === 'Enter') {
-        e.preventDefault()
-        if (isInPlayback.value) {
-          endPlayback()
-        } else {
-          startPlayback()
-        }
-      } else if (e.shiftKey && e.key === 'Enter') {
-        emit('refresh')
-      }
-    }
-
-    onMounted(() => {
-      document.addEventListener('keydown', hotKeyHandler);
-    })
-    onBeforeUnmount(() => {
-      document.removeEventListener('keydown', hotKeyHandler);
-    })
 
     // Resolution
     const resolutionOptions = computed(() => precipitationStore.resolutionOptions);
@@ -363,7 +330,14 @@ export default defineComponent({
       }
       return speed.speed;
     });
-    const isInPlayback: Ref<boolean> = ref(false);
+    const isInPlayback = computed({
+      get() {
+        return precipitationStore.isInPlayback
+      },
+      set(is: boolean) {
+        precipitationStore.isInPlayback = is;
+      }
+    });
     const playbackInterval: Ref<Nullable<ReturnType<typeof setInterval> | number>> = ref();
 
     function startPlayback() {

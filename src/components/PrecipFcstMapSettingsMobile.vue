@@ -255,7 +255,14 @@ export default defineComponent({
       }
       return speed.speed;
     });
-    const isInPlayback: Ref<boolean> = ref(false);
+    const isInPlayback = computed({
+      get() {
+        return precipitationStore.isInPlayback
+      },
+      set(is: boolean) {
+        precipitationStore.isInPlayback = is;
+      }
+    });
     const playbackInterval: Ref<Nullable<ReturnType<typeof setInterval> | number>> = ref();
 
     function startPlayback() {
