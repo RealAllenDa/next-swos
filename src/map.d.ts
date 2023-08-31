@@ -15,6 +15,10 @@ declare interface ChooseOptions {
   value: string;
 }
 
+declare interface ResolutionOptions extends ChooseOptions {
+  thumbnail?: boolean;
+}
+
 declare interface LegendOptions {
   title: string;
   unit: string;
@@ -23,7 +27,7 @@ declare interface LegendOptions {
 
 declare interface MapInterface {
   data_id: string;
-  resolution: ChooseOptions[];
+  resolution: ResolutionOptions[];
   legends: LegendOptions;
   torrential_avail: boolean;
   gpv_avail: boolean;
