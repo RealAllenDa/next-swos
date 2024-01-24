@@ -3,6 +3,11 @@
     <TyphoonMapSettings></TyphoonMapSettings>
     <TyphoonMap ref="typhoonMap" style="flex: 1"></TyphoonMap>
     <PageLoading :show="!initialized"></PageLoading>
+    <q-inner-loading
+      :showing="selectedTyphoonsInList.length === 0"
+      style="z-index: 999; font-size: 2.5em; user-select: none">
+      No active typhoons currently.
+    </q-inner-loading>
   </q-page>
 </template>
 
@@ -72,7 +77,8 @@ export default defineComponent({
     })
 
     return {
-      initialized
+      initialized,
+      selectedTyphoonsInList
     }
   }
 });
