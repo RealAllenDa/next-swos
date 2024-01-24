@@ -369,16 +369,16 @@ export default defineComponent({
           let value = precipitation * 1000;
           if (value > 0) {
             dataCollectionSquare.features.push(
-                turf.bboxPolygon(
-                    turf.bbox(turf.circle([station.longitude, station.latitude], 1)),
-                    {
-                      properties: {
-                        name: station.name,
-                        value: value,
-                        color: color
-                      }
-                    }
-                )
+              turf.bboxPolygon(
+                turf.bbox(turf.circle([station.longitude, station.latitude], 1)),
+                {
+                  properties: {
+                    name: station.name,
+                    value: value,
+                    color: color
+                  }
+                }
+              )
             )
           }
         })
@@ -452,11 +452,11 @@ export default defineComponent({
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             map.value!.getCanvas().style.cursor = 'pointer';
             popup
-                .setLngLat(e.lngLat)
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                .setHTML(`${e.features![0].properties.name}: ${e.features![0].properties.value / 1000}mm`)
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                .addTo(map.value!);
+              .setLngLat(e.lngLat)
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+              .setHTML(`${e.features![0].properties.name}: ${e.features![0].properties.value / 1000}mm`)
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+              .addTo(map.value!);
           })
           map.value?.on('mouseleave', 'rain-measurements-3d', () => {
             popup.remove()
@@ -532,7 +532,7 @@ export default defineComponent({
         return;
       }
       if (currentData.value === undefined || currentData.value === null ||
-          map.value === undefined && !precipitationStore.initialized) {
+        map.value === undefined && !precipitationStore.initialized) {
         return;
       }
       refreshRainLayer();
@@ -562,7 +562,7 @@ export default defineComponent({
         const anchor = document.createElement('a')
         anchor.setAttribute('href', pngImage)
         anchor.setAttribute('download',
-            `SWoS_PrecipForecast_${format(new Date(), 'yyyy_mm_dd_HH_mm_ss')}.png`)
+          `SWoS_PrecipForecast_${format(new Date(), 'yyyy_mm_dd_HH_mm_ss')}.png`)
         anchor.click()
         genericStore.screenshot = false;
       }
@@ -571,6 +571,7 @@ export default defineComponent({
     onMounted(() => {
       map.value = markRaw(new Map({
         container: 'map',
+        maxZoom: 13,
         // pitchWithRotate: false,
         // dragRotate: false,
         // touchPitch: false,
@@ -590,7 +591,7 @@ export default defineComponent({
               ],
               'tileSize': 256,
               'attribution':
-                  `&copy; ${new Date().getFullYear()} SWoS, HomeNetwork, AllenDa.<br>
+                `&copy; ${new Date().getFullYear()} SWoS, HomeNetwork, AllenDa.<br>
         Data source: <a href="https://www.rainviewer.com/" target="_blank">RainViewer</a><br>
         Map source: GaoDe`
 
