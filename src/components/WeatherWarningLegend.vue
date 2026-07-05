@@ -2,23 +2,23 @@
   <div>
     <div class="weather-warning-legend">
       <div class="legend-color q-mr-xs warning-4"></div>
-      <div class="legend-text">Red Warning</div>
+      <div class="legend-text">Red Alert</div>
     </div>
     <div class="weather-warning-legend">
       <div class="legend-color q-mr-xs warning-3"></div>
-      <div class="legend-text">Orange Warning</div>
+      <div class="legend-text">Orange Alert</div>
     </div>
     <div class="weather-warning-legend">
       <div class="legend-color q-mr-xs warning-2"></div>
-      <div class="legend-text">Yellow Warning</div>
+      <div class="legend-text">Yellow Alert</div>
     </div>
     <div class="weather-warning-legend">
       <div class="legend-color q-mr-xs warning-1"></div>
-      <div class="legend-text">Blue Warning</div>
+      <div class="legend-text">Blue Alert</div>
     </div>
     <div class="weather-warning-legend">
       <div class="legend-color q-mr-xs warning-0"></div>
-      <div class="legend-text">No Warnings</div>
+      <div class="legend-text">No Alerts</div>
     </div>
   </div>
 </template>
