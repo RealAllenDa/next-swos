@@ -49,7 +49,7 @@ export default defineComponent({
     }
     const parseLevel = weatherWarningStore.parseLevel;
 
-    const {data} = sdk.useFetch<GeoJsonObject>('/parse/base/shanghai.geojson')
+    const {data} = sdk.useFetch<GeoJsonObject>('https://earthquake.daziannetwork.com/shanghai.geojson', true)
     watch(data, () => {
       if (data.value === undefined || data.value === null ||
         map === undefined || map === null ||
@@ -157,7 +157,7 @@ export default defineComponent({
     onMounted(() => {
       map = new Map('map', mapStore.options);
       // TODO: Replace in future
-      new TileLayer('http://map.geoq.cn/ArcGIS/rest/services/ChinaOnlineStreetPurplishBlue/MapServer/tile/{z}/{y}/{x}')
+      new TileLayer('https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}')
         .addTo(map)
       warningLayer.value = new GeoJSON(undefined, {
         style: getStyle,
