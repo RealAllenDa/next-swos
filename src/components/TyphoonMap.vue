@@ -92,6 +92,7 @@ export default defineComponent({
         landInfoLayer.value === null || landInfoLayer.value === undefined) {
         return;
       }
+      return;
 
       landInfoLayer.value.clearLayers()
 
