@@ -355,19 +355,19 @@ export default defineComponent({
         rain.value.rain.forEach(station => {
           const precipitation = station.value;
           const color = getRainMeasurementsColor(precipitation);
-          dataCollection.features.push({
-            type: 'Feature',
-            geometry: {
-              type: 'Point',
-              coordinates: [station.longitude, station.latitude]
-            },
-            properties: {
-              value: round(precipitation, 0),
-              color: color
-            }
-          })
           let value = precipitation * 1000;
-          if (value > 0) {
+          if (precipitation > 1) {
+            dataCollection.features.push({
+              type: 'Feature',
+              geometry: {
+                type: 'Point',
+                coordinates: [station.longitude, station.latitude]
+              },
+              properties: {
+                value: round(precipitation, 2),
+                color: color
+              }
+            })
             dataCollectionSquare.features.push(
               turf.bboxPolygon(
                 turf.bbox(turf.circle([station.longitude, station.latitude], 1)),
@@ -402,7 +402,8 @@ export default defineComponent({
             source: 'rain-measurements',
             minzoom: 8,
             layout: {
-              'text-allow-overlap': true,
+              'symbol-sort-key': ['get', 'value'],
+              'text-allow-overlap': false,
               'text-font': ['Roboto Bold'],
               'text-size': 20,
               'text-field': ['get', 'value']
@@ -433,7 +434,9 @@ export default defineComponent({
             type: 'circle',
             source: 'rain-measurements',
             maxzoom: 8,
-            layout: {},
+            layout: {
+              'circle-sort-key': ['get', 'value']
+            },
             paint: {
               'circle-radius': 7,
               'circle-color': ['get', 'color'],
@@ -505,7 +508,7 @@ export default defineComponent({
           // 'source-layer': 'sliced',
           layout: {},
           paint: {
-            'fill-color': ['to-color', ['concat', 'rgba(', ['get', 'c'], ')']],
+            'fill-color': ['to-color', ['get', 'c']],
             'fill-opacity': 0.7,
             'fill-outline-color': 'rgba(0,0,0,0)'
           }
