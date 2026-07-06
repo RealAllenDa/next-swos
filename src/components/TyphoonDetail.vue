@@ -1,5 +1,5 @@
 <template>
-  <div style="max-width: 520px;">
+  <div style="max-width: 520px">
     <q-card>
       <q-tabs
         :model-value="currentTyphoonName"
@@ -11,13 +11,21 @@
         narrow-indicator
         @update:model-value="updateDetailTyphoon"
       >
-        <q-tab v-for="i in typhoonToFocus" :key="i.value"
-               :label="i.label" :name="i.value"/>
+        <q-tab
+          v-for="i in typhoonToFocus"
+          :key="i.value"
+          :label="i.label"
+          :name="i.value"
+        />
       </q-tabs>
 
-      <q-separator/>
+      <q-separator />
 
-      <q-tab-panels v-model="currentTyphoonName" animated>
+      <q-tab-panels
+        :model-value="currentTyphoonName"
+        animated
+        @update:model-value="updateDetailTyphoon"
+      >
         <q-tab-panel v-for="i in typhoonToFocus" :key="i.value" :name="i.value">
           <q-table
             v-model:pagination="pagination"
@@ -35,22 +43,23 @@
             <template v-slot:body="props">
               <q-tr
                 :class="
-                  props.row.index === currentTyphoonFocusIndex ?
-                  `bg-${getFillBrand(props.row.category)} text-${getFillBrand(props.row.category)}` : ''
+                  props.row.index === currentTyphoonFocusIndex
+                    ? `bg-${getFillBrand(
+                        props.row.category
+                      )} text-${getFillBrand(props.row.category)}`
+                    : ''
                 "
                 :props="props"
                 class="cursor-pointer"
-                @click="() => changeTyphoonFocus(props.row)">
-                <q-td
-                  v-for="col in props.cols"
-                  :key="col.name"
-                  :props="props"
-                >
+                @click="() => changeTyphoonFocus(props.row)"
+              >
+                <q-td v-for="col in props.cols" :key="col.name" :props="props">
                   <template v-if="col.name === 'category'">
                     <q-badge
                       :color="getFillBrand(col.value)"
                       :label="col.value"
-                      :text-color="getFillBrand(col.value)"/>
+                      :text-color="getFillBrand(col.value)"
+                    />
                   </template>
                   <template v-else>
                     {{ col.value }}
@@ -60,15 +69,23 @@
             </template>
             <template v-slot:header="props">
               <q-tr :props="props">
-                <q-th
-                  v-for="col in props.cols"
-                  :key="col.name"
-                  :props="props"
-                >
-                  {{ col.label }}<br>
-                  <span v-if="col.name === 'pressure'" class="text-italic float-right">hPa</span>
-                  <span v-else-if="col.name === 'speed'" class="text-italic float-right">m/s</span>
-                  <span v-else-if="col.name === 'move_speed'" class="text-italic float-right">km/h</span>
+                <q-th v-for="col in props.cols" :key="col.name" :props="props">
+                  {{ col.label }}<br />
+                  <span
+                    v-if="col.name === 'pressure'"
+                    class="text-italic float-right"
+                    >hPa</span
+                  >
+                  <span
+                    v-else-if="col.name === 'speed'"
+                    class="text-italic float-right"
+                    >m/s</span
+                  >
+                  <span
+                    v-else-if="col.name === 'move_speed'"
+                    class="text-italic float-right"
+                    >km/h</span
+                  >
                 </q-th>
               </q-tr>
             </template>
@@ -76,15 +93,13 @@
         </q-tab-panel>
       </q-tab-panels>
     </q-card>
-
   </div>
 </template>
 
 <script lang="ts">
-import {computed, defineComponent, ref} from 'vue';
-import {useTyphoonStore} from 'stores/typhoon';
-import {format, parse} from 'date-fns';
-import sdk from 'src/composables/sdk';
+import { computed, defineComponent, ref } from 'vue';
+import { useTyphoonStore } from 'stores/typhoon';
+import { format, parse } from 'date-fns';
 
 export default defineComponent({
   name: 'TyphoonSelection',
@@ -93,26 +108,38 @@ export default defineComponent({
     const typhoonToFocus = computed(() => typhoonStore.typhoonsToFocus);
     const currentTyphoonName = computed(() => typhoonStore.currentTyphoonFocus);
     const detailColumns = computed(() => typhoonStore.detailColumns);
-    const currentTyphoonFocusIndex = computed(() => typhoonStore.currentTyphoonIndex);
+    const currentTyphoonFocusIndex = computed(
+      () => typhoonStore.currentTyphoonIndex
+    );
 
     const typhoonDetails = computed(() => {
-      if (!Object.keys(typhoonStore.currentTyphoons).includes(currentTyphoonName.value)) {
-        return;
+      if (
+        !Object.keys(typhoonStore.currentTyphoons).includes(
+          currentTyphoonName.value
+        )
+      ) {
+        return [];
       }
-      const currentTyphoon = typhoonStore.currentTyphoons[currentTyphoonName.value];
-      console.log(currentTyphoon)
+      const currentTyphoon =
+        typhoonStore.currentTyphoons[currentTyphoonName.value];
+      const content: TyphoonDetailTable[] = [];
 
-      let content: TyphoonDetailTable[] = [];
-
-      const forecasts = currentTyphoon.points[currentTyphoon.points.length - 1].forecast;
+      const currentPoint = currentTyphoon.points.at(-1);
+      const forecasts = currentPoint?.forecast ?? null;
       if (forecasts !== null) {
         const selectedForecast = forecasts.find(
-          t => t.sets === typhoonStore.currentTyphoonForecastOrigin
+          (t) => t.sets === typhoonStore.currentTyphoonForecastOrigin
         );
         // noinspection JSIncompatibleTypesComparison
         if (selectedForecast !== undefined) {
-          const reversedForecast = [...selectedForecast.points].reverse();
-          reversedForecast.pop(); // Pop unwanted nowcast
+          const forecastPoints = selectedForecast.points.filter(
+            (point) =>
+              !currentPoint ||
+              point.time !== currentPoint.time ||
+              point.latitude !== currentPoint.latitude ||
+              point.longitude !== currentPoint.longitude
+          );
+          const reversedForecast = [...forecastPoints].reverse();
           reversedForecast.forEach((point, index) => {
             // Time: yyyy-MM-ddTH:mm:ss => MM/dd HH:mm
             const time = point.time.replace('T', ' ');
@@ -123,12 +150,10 @@ export default defineComponent({
               speed: point.speed.toString(),
               move_speed: '---',
               category: point.strong,
-              index: -(index + 1),
-              is_forecast: true
-            })
-          })
-        } else {
-          sdk.showNotification('negative', 'No forecast available');
+              index: -(forecastPoints.length - index),
+              is_forecast: true,
+            });
+          });
         }
       }
 
@@ -141,24 +166,24 @@ export default defineComponent({
           date: format(date, 'MM/dd HH:mm'),
           pressure: point.pressure.toString(),
           speed: point.speed.toString(),
-          move_speed: point.move_speed === 0 ? 'Slow' : point.move_speed.toString(),
+          move_speed:
+            point.move_speed === 0 ? 'Slow' : point.move_speed.toString(),
           category: point.strong,
           index: index,
-          is_forecast: false
-        })
-      })
+          is_forecast: false,
+        });
+      });
 
-      console.log(content)
       return content;
     });
     const getFillBrand = typhoonStore.getFillBrand;
 
     function updateDetailTyphoon(id: string) {
-      typhoonStore.currentTyphoonFocus = id
+      typhoonStore.currentTyphoonFocus = id;
     }
 
     function changeTyphoonFocus(row: TyphoonDetailTable) {
-      typhoonStore.currentTyphoonIndex = row.index
+      typhoonStore.currentTyphoonIndex = row.index;
     }
 
     return {
@@ -173,11 +198,11 @@ export default defineComponent({
       getFillBrand,
 
       pagination: ref({
-        rowsPerPage: 0
-      })
-    }
-  }
-})
+        rowsPerPage: 0,
+      }),
+    };
+  },
+});
 </script>
 
 <style lang="scss">
@@ -188,7 +213,7 @@ export default defineComponent({
   .q-table__bottom,
   thead tr:first-child th {
     /* bg color is important for th; just specify one */
-    background-color: #fff;
+    background-color: var(--swos-surface);
   }
 
   thead tr th {

@@ -1,37 +1,26 @@
-import {isRef, Ref, ref, unref, watchEffect} from 'vue';
-import {Notify} from 'quasar';
+import { type Ref, ref, unref, watchEffect } from 'vue';
+import { Notify } from 'quasar';
 
 class SDK {
   public apiUrl: string;
   public dbApiUrl: string;
+  public readonly productionApiUrl = 'https://api.daziannetwork.com';
 
   private readonly logColor: string;
 
   private readonly useProductionAPI: boolean;
 
-  constructor(useProductionAPI = false) {
+  constructor() {
     this.logColor = ENVIRONMENT === 'production' ? '#43bb88' : 'orange';
-
-    if (ENVIRONMENT === 'development') {
-      this.useProductionAPI = useProductionAPI;
-    } else {
-      this.useProductionAPI = true;
-    }
-    if (!this.useProductionAPI) {
-      this.apiUrl = 'http://10.0.0.50:8000';
-      // this.dbApiUrl = 'http://10.0.0.100:7800';
-      this.dbApiUrl = 'https://db.api.daziannetwork.com';
-    } else {
-      this.apiUrl = 'https://api.daziannetwork.com'; // TODO
-      this.dbApiUrl = 'https://db.api.daziannetwork.com';
-    }
+    this.apiUrl = API_URL;
+    this.dbApiUrl = DB_API_URL;
+    this.useProductionAPI = this.apiUrl === this.productionApiUrl;
   }
 
   printLogo(): void {
     // eslint-disable-next-line no-console
     console.log(
-      `${LOGO}\n`
-      + `Version ${VERSION}-${ENVIRONMENT}. `,
+      `${LOGO}\n` + `Version ${VERSION}-${ENVIRONMENT}. `,
       `color: ${this.logColor}; font-size: 20px; font-weight: bold;`
     );
     if (this.useProductionAPI) {
@@ -43,52 +32,77 @@ class SDK {
     }
   }
 
-  useFetch<T>(url: string, useCustomPrefix = false) {
-    // IMPORTANT: Set data to undefined first
-    // Undefined is for not-fetched data; null is for errored data
-    const data: Ref<Nullable<T>> = ref(undefined)
-    const error = ref(null)
+  resolveUrl(url: string, useCustomPrefix = false): string {
+    return useCustomPrefix ? url : `${this.apiUrl}${url}`;
+  }
 
-    function doFetch(apiUrl: string, that: SDK) {
-      data.value = undefined
-      error.value = null
-      fetch(`${apiUrl}${unref(url)}`)
-        .then((res) => res.json())
-        .then((json) => (data.value = json['status'] !== -1 ? json : null))
-        .catch((err) => {
-          error.value = err;
-          that.showNotification('negative', `Failed to fetch ${url}: ${err}`)
-        })
+  async fetchJson<T>(
+    url: string,
+    useCustomPrefix = false,
+    signal?: AbortSignal
+  ): Promise<T> {
+    const response = await fetch(this.resolveUrl(url, useCustomPrefix), {
+      signal,
+    });
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}`);
     }
+    const payload = await response.json();
+    if (
+      payload &&
+      typeof payload === 'object' &&
+      !Array.isArray(payload) &&
+      payload.status === -1
+    ) {
+      throw new Error(payload.message ?? 'API returned an error');
+    }
+    return payload as T;
+  }
 
-    if (!useCustomPrefix) {
-      if (isRef(url)) {
-        watchEffect(() => doFetch(this.apiUrl, this))
-      } else {
-        doFetch(this.apiUrl, this)
+  fetchProductionJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+    return this.fetchJson<T>(`${this.productionApiUrl}${url}`, true, signal);
+  }
+
+  useFetch<T>(url: string | Ref<string>, useCustomPrefix = false) {
+    const data: Ref<Nullable<T>> = ref(undefined);
+    const error = ref<Error | null>(null);
+
+    const doFetch = async (requestUrl: string, signal?: AbortSignal) => {
+      data.value = undefined;
+      error.value = null;
+      try {
+        data.value = await this.fetchJson<T>(
+          requestUrl,
+          useCustomPrefix,
+          signal
+        );
+      } catch (cause) {
+        if (cause instanceof DOMException && cause.name === 'AbortError')
+          return;
+        error.value = cause instanceof Error ? cause : new Error(String(cause));
+        data.value = null;
+        this.showNotification(
+          'negative',
+          `Failed to fetch ${requestUrl}: ${error.value.message}`
+        );
       }
-    } else {
-      if (isRef(url)) {
-        watchEffect(() => doFetch('', this))
-      } else {
-        doFetch('', this)
-      }
-    }
+    };
 
-    if (error.value !== null) {
-      this.showNotification('negative', error.value)
-    }
+    watchEffect((onCleanup) => {
+      const controller = new AbortController();
+      void doFetch(unref(url), controller.signal);
+      onCleanup(() => controller.abort());
+    });
 
-
-    return {data, error}
+    return { data, error };
   }
 
   showNotification(type: string, message: string) {
     Notify.create({
       type: type,
-      message: message
-    })
-    console.error(message)
+      message: message,
+    });
+    if (ENVIRONMENT !== 'production') console.error(message);
   }
 }
 

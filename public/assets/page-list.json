@@ -1,0 +1,74 @@
+[
+  {
+    "id": "prec-forecast",
+    "name": "降雨分析",
+    "icon": "svguse:nav-icons/icons.svg#precipitation-forecast",
+    "href": "/precip/forecast"
+  },
+  {
+    "id": "rain-1h",
+    "name": "1小时降雨",
+    "icon": "fa-solid fa-cloud-rain",
+    "href": "/rain/1h"
+  },
+  {
+    "id": "rain-24h",
+    "name": "24小时降雨",
+    "icon": "fa-solid fa-cloud-showers-heavy",
+    "href": "/rain/24h"
+  },
+  {
+    "id": "rain-period",
+    "name": "降雨重现期",
+    "icon": "fa-solid fa-clock-rotate-left",
+    "href": "/rain/period"
+  },
+  {
+    "id": "wind",
+    "name": "风速风向",
+    "icon": "fa-solid fa-wind",
+    "href": "/wind"
+  },
+  {
+    "id": "inundation",
+    "name": "道路积水",
+    "icon": "fa-solid fa-house-flood-water",
+    "href": "/inundation"
+  },
+  {
+    "id": "flood-rivers",
+    "name": "河流洪水预报",
+    "icon": "fa-solid fa-water",
+    "href": "/flood/rivers"
+  },
+  {
+    "id": "flood-stations",
+    "name": "水位观测站",
+    "icon": "fa-solid fa-gauge-high",
+    "href": "/flood/stations"
+  },
+  {
+    "id": "typhoon",
+    "name": "台风",
+    "icon": "fa-solid fa-hurricane",
+    "href": "/typhoon"
+  },
+  {
+    "id": "weather-warning",
+    "name": "天气预警",
+    "icon": "fa-solid fa-triangle-exclamation",
+    "href": "/warning/weather"
+  },
+  {
+    "id": "flood-warning",
+    "name": "防汛预警",
+    "icon": "fa-solid fa-house-flood-water",
+    "href": "/warning/flood"
+  },
+  {
+    "id": "warning-overview",
+    "name": "警报预报一览",
+    "icon": "fa-solid fa-table-list",
+    "href": "/generic"
+  }
+]

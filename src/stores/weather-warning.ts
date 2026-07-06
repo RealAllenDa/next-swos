@@ -1,28 +1,34 @@
-import {defineStore} from 'pinia';
+import { defineStore } from 'pinia';
 
 export const useWeatherWarningStore = defineStore('warning/weather', {
   state: () => ({
-    currentWarningList: {} as WeatherWarningList,
-    currentSelectedDistrict: ''
+    currentWarningList: {
+      coloring: {},
+      districts: {},
+      message_time: '',
+      timestamp: 0,
+    } as WeatherWarningList,
+    currentSelectedDistrict: '',
   }),
   actions: {
     setCurrentWarningList(list: WeatherWarningList) {
-      this.currentWarningList = list;
+      const excludedDistricts = new Set(['江苏省', '浙江省']);
+      this.currentWarningList = {
+        ...list,
+        coloring: Object.fromEntries(
+          Object.entries(list.coloring ?? {}).filter(
+            ([district]) => !excludedDistricts.has(district)
+          )
+        ),
+        districts: Object.fromEntries(
+          Object.entries(list.districts ?? {}).filter(
+            ([district]) => !excludedDistricts.has(district)
+          )
+        ),
+      };
     },
-
     parseLevel(level: number) {
-      switch (level) {
-        case 1:
-          return '蓝色';
-        case 2:
-          return '黄色';
-        case 3:
-          return '橙色';
-        case 4:
-          return '红色';
-        default:
-          return '未知';
-      }
-    }
-  }
-})
+      return ['未知', '蓝色', '黄色', '橙色', '红色'][level] ?? '未知';
+    },
+  },
+});

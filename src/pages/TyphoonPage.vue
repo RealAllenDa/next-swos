@@ -1,135 +1,120 @@
 <template>
-  <q-page class="column items-stretch">
-    <TyphoonMapSettings></TyphoonMapSettings>
-    <TyphoonMap ref="typhoonMap" style="flex: 1"></TyphoonMap>
-    <PageLoading :show="!initialized"></PageLoading>
+  <q-page class="fullscreen-map-page column items-stretch no-wrap">
+    <q-toolbar class="dashboard-title-toolbar">
+      <div>
+        <div class="text-h6">台风</div>
+        <div class="text-caption text-grey-7">Typhoon Tracking</div>
+      </div>
+    </q-toolbar>
+    <TyphoonMapSettings />
+    <TyphoonMap style="flex: 1" />
+    <PageLoading :show="loading" />
     <q-inner-loading
-      :showing="selectedTyphoonsInList.length === 0"
-      style="z-index: 999; font-size: 2.5em; user-select: none">
-      No active typhoons currently.
-    </q-inner-loading>
+      :showing="!loading && selectedTyphoons.length === 0"
+      style="z-index: 999; font-size: 2.5em; user-select: none"
+      label="当前没有活动台风。"
+    />
   </q-page>
 </template>
 
-<script lang="ts">
-import {computed, defineComponent, onMounted, onUnmounted, ref, Ref, watch} from 'vue';
-import TyphoonMap from 'src/components/TyphoonMap.vue';
-import TyphoonMapSettings from 'src/components/TyphoonMapSettings.vue';
-import sdk from 'src/composables/sdk';
-import {useTyphoonStore} from 'stores/typhoon';
+<script setup lang="ts">
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import TyphoonMap from 'components/TyphoonMap.vue';
+import TyphoonMapSettings from 'components/TyphoonMapSettings.vue';
 import PageLoading from 'components/PageLoading.vue';
-import {useGenericStore} from 'stores/generic';
+import sdk from 'src/composables/sdk';
+import { useProductionPollingFetch } from 'src/composables/use-polling-fetch';
+import { useTyphoonStore } from 'stores/typhoon';
+import { useGenericStore } from 'stores/generic';
 
-export default defineComponent({
-  name: 'TyphoonPage',
-  components: {PageLoading, TyphoonMapSettings, TyphoonMap},
-  setup() {
-    const initialized: Ref<boolean> = ref(false);
-    const typhoonStore = useTyphoonStore()
-    const selectedTyphoonsInList = computed(() => typhoonStore.selectedTyphoonsInList)
+const store = useTyphoonStore();
+store.$reset();
+useGenericStore().initPageSpec(false, false, false);
 
-    typhoonStore.clearLists();
+const selectedTyphoons = computed(() => store.selectedTyphoonsInList);
+const detailsLoading = ref(false);
+const { data: typhoonList, loading: listLoading } = useProductionPollingFetch<
+  TyphoonList[]
+>('/warning/typhoon_activity');
+const loading = computed(() => listLoading.value || detailsLoading.value);
+let detailController: AbortController | undefined;
+let requestVersion = 0;
 
-    function initTyphoonList() {
-      initialized.value = false;
-      const typhoons = {} as { [id: string]: TyphoonDetail };
-      if (selectedTyphoonsInList.value.length === 0) {
-        typhoonStore.currentTyphoons = {};
-        initialized.value = true;
-      }
-      selectedTyphoonsInList.value.forEach(typhoon => {
-        const {data} = sdk.useFetch<TyphoonDetail[]>(`https://api.daziannetwork.com/warning/typhoon_detail?id=${typhoon.tfid}&_=${new Date().getTime()}`, true);
-        watch(data, () => {
-          if (data.value === null || data.value === undefined) {
-            sdk.showNotification('negative', 'Failed to fetch typhoon detail')
-            return
-          }
-          typhoons[typhoon.tfid] = data.value[0];
-          if (Object.keys(typhoons).length === selectedTyphoonsInList.value.length) {
-            typhoonStore.currentTyphoons = typhoons;
-
-            initialized.value = true;
-          }
-        })
-      });
-    }
-
-    const {data: typhoonList} = sdk.useFetch<TyphoonList[]>(`https://api.daziannetwork.com/warning/typhoon_activity?_=${new Date().getTime()}`, true);
-    watch(typhoonList, () => {
-      if (typhoonList.value === null || typhoonList.value === undefined) {
-        sdk.showNotification('negative', 'Failed to refresh: list is null or undefined.')
-      } else {
-        typhoonStore.setList(typhoonList.value);
-        initTyphoonList();
-      }
-    });
-
-    watch(selectedTyphoonsInList, () => {
-      initTyphoonList();
-    });
-
-    onMounted(() => {
-      typhoonStore.$reset()
-      useGenericStore().initPageSpec(false, false, false)
-    })
-    onUnmounted(() => {
-      typhoonStore.$dispose()
-    })
-
-    return {
-      initialized,
-      selectedTyphoonsInList
-    }
-  }
+watch(typhoonList, (list) => {
+  if (list) store.setList(list);
 });
+
+watch(
+  selectedTyphoons,
+  async (list) => {
+    detailController?.abort();
+    detailController = new AbortController();
+    const version = ++requestVersion;
+    if (list.length === 0) {
+      store.currentTyphoons = {};
+      detailsLoading.value = false;
+      return;
+    }
+
+    detailsLoading.value = true;
+    try {
+      const entries = await Promise.all(
+        list.map(async (typhoon) => {
+          const details = await sdk.fetchProductionJson<TyphoonDetail[]>(
+            `/warning/typhoon_detail?id=${encodeURIComponent(
+              typhoon.tfid
+            )}&_=${Date.now()}`,
+            detailController?.signal
+          );
+          if (!details[0]) throw new Error(`台风 ${typhoon.tfid} 缺少详情`);
+          return [typhoon.tfid, details[0]] as const;
+        })
+      );
+      if (version === requestVersion)
+        store.currentTyphoons = Object.fromEntries(entries);
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return;
+      sdk.showNotification(
+        'negative',
+        cause instanceof Error ? cause.message : String(cause)
+      );
+    } finally {
+      if (version === requestVersion) detailsLoading.value = false;
+    }
+  },
+  { deep: true }
+);
+
+onBeforeUnmount(() => detailController?.abort());
 </script>
 
 <style lang="scss">
-.text-td {
-  color: #000;
-}
-
-.bg-td {
-  background: #00D5CB;
-}
-
-.text-ts {
-  color: #000;
-}
-
-.bg-ts {
-  background: #FCFA00;
-}
-
+.text-td,
+.text-ts,
 .text-sts {
   color: #000;
 }
-
-.bg-sts {
-  background: #FDAE0D;
-}
-
-.text-ty {
-  color: #FFFFFF;
-}
-
-.bg-ty {
-  background: #FB3B00;
-}
-
-.text-sty {
-  color: #FFFFFF;
-}
-
-.bg-sty {
-  background: #FC4D80;
-}
-
+.text-ty,
+.text-sty,
 .text-super-ty {
-  color: #FFFFFF;
+  color: #fff;
 }
-
+.bg-td {
+  background: #00d5cb;
+}
+.bg-ts {
+  background: #fcfa00;
+}
+.bg-sts {
+  background: #fdae0d;
+}
+.bg-ty {
+  background: #fb3b00;
+}
+.bg-sty {
+  background: #fc4d80;
+}
 .bg-super-ty {
-  background: #C2218E;
+  background: #c2218e;
 }
 </style>

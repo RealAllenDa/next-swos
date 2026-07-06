@@ -1,5 +1,13 @@
 <template>
-  <q-page class="column items-stretch">
+  <q-page class="precipitation-page column items-stretch no-wrap">
+    <q-toolbar class="precipitation-toolbar">
+      <div>
+        <div class="text-h6">降雨分析</div>
+        <div class="text-caption text-grey-7">
+          Precipitation Analysis &amp; Forecast
+        </div>
+      </div>
+    </q-toolbar>
     <MapSettings
       v-show="showToolbar"
       class="gt-sm"
@@ -9,25 +17,31 @@
     <PrecipFcstMapSettingsMobile
       v-show="showToolbar"
       class="lt-md"
-      @refresh="() => refreshPrecipitation('refresh')"></PrecipFcstMapSettingsMobile>
+      @refresh="() => refreshPrecipitation('refresh')"
+    ></PrecipFcstMapSettingsMobile>
     <PageLoading :show="!initialized"></PageLoading>
   </q-page>
 </template>
 
 <script lang="ts">
-import {computed, defineComponent, onMounted, onUnmounted, watch} from 'vue';
+import { computed, defineComponent, onBeforeUnmount, onMounted } from 'vue';
 import MapSettings from 'components/PrecipFcstMapSettings.vue';
 import PrecipitationMap from 'components/PrecipFcstMap.vue';
-import {usePrecipitationStore} from 'stores/precipitation';
+import { usePrecipitationStore } from 'stores/precipitation';
 import sdk from 'src/composables/sdk';
-import {useRoute} from 'vue-router';
+import { useRoute } from 'vue-router';
 import PageLoading from 'components/PageLoading.vue';
-import {useGenericStore} from 'stores/generic';
+import { useGenericStore } from 'stores/generic';
 import PrecipFcstMapSettingsMobile from 'components/PrecipFcstMapSettingsMobile.vue';
 
 export default defineComponent({
   name: 'PrecipitationForecast',
-  components: {PrecipFcstMapSettingsMobile, PageLoading, PrecipitationMap, MapSettings},
+  components: {
+    PrecipFcstMapSettingsMobile,
+    PageLoading,
+    PrecipitationMap,
+    MapSettings,
+  },
   setup() {
     const genericStore = useGenericStore();
     const precipitationStore = usePrecipitationStore();
@@ -37,60 +51,117 @@ export default defineComponent({
     const routeTorrential = computed(() => route.query.torrential === 'y');
     const routeGpv = computed(() => route.query.gpv === 'y');
     const routeStation = computed(() => route.query.station === 'y');
-    const initialized = computed({
-      get() {
-        return precipitationStore.initialized
-      },
-      set() {
-        precipitationStore.initialized = true;
-      }
-    });
+    const initialized = computed(() => precipitationStore.initialized);
     const showToolbar = computed(() => {
-      return genericStore.showToolbar
-    })
+      return genericStore.showToolbar;
+    });
 
-    function initPrecipitation() {
-      const {data: options} = sdk.useFetch<MapSpec>('/static/generic/analysis_map.json');
-      watch(options, () => {
-        if (options.value === null || options.value === undefined) {
-          sdk.showNotification('negative', 'Failed to refresh: spec is null or undefined.')
-        } else {
-          precipitationStore.setSpec(options.value);
-        }
-        refreshPrecipitation('initialize')
-      })
+    let controller: AbortController | undefined;
+
+    async function initPrecipitation() {
+      controller?.abort();
+      controller = new AbortController();
+      try {
+        const options = await sdk.fetchJson<MapSpec>(
+          '/static/generic/analysis_map.json',
+          false,
+          controller.signal
+        );
+        precipitationStore.setSpec(options);
+        await refreshPrecipitation('initialize', controller.signal);
+      } catch (cause) {
+        if (cause instanceof DOMException && cause.name === 'AbortError')
+          return;
+        sdk.showNotification(
+          'negative',
+          `降雨分析初始化失败：${
+            cause instanceof Error ? cause.message : String(cause)
+          }`
+        );
+      }
     }
 
-    function refreshPrecipitation(mutationType: string) {
-      const {data} = sdk.useFetch<PrecipitationAnalysisList>('/precip/analysis/list');
-      watch(data, () => {
-        if (data.value === null || data.value === undefined) {
-          sdk.showNotification('negative', 'Failed to refresh: data is null or undefined.')
-        } else {
-          precipitationStore.setList(data.value, mutationType);
-          if (mutationType !== 'refresh') {
-            precipitationStore.setOptions(<string>routeResolution.value, <string>routeDuration.value, routeTorrential.value, routeGpv.value, routeStation.value);
-          }
-          initialized.value = true;
+    async function refreshPrecipitation(
+      mutationType: string,
+      signal?: AbortSignal
+    ) {
+      try {
+        const data = await sdk.fetchJson<PrecipitationAnalysisList>(
+          '/precip/analysis/list',
+          false,
+          signal
+        );
+        if (mutationType !== 'refresh') {
+          precipitationStore.setOptions(
+            typeof routeResolution.value === 'string'
+              ? routeResolution.value
+              : undefined,
+            typeof routeDuration.value === 'string'
+              ? routeDuration.value
+              : undefined,
+            undefined,
+            undefined,
+            undefined
+          );
         }
-      })
+        precipitationStore.setList(data, mutationType);
+        if (mutationType !== 'refresh') {
+          precipitationStore.setOptions(
+            undefined,
+            undefined,
+            routeTorrential.value,
+            routeGpv.value,
+            routeStation.value
+          );
+        }
+        precipitationStore.initialized = true;
+      } catch (cause) {
+        if (cause instanceof DOMException && cause.name === 'AbortError')
+          return;
+        sdk.showNotification(
+          'negative',
+          `降雨分析刷新失败：${
+            cause instanceof Error ? cause.message : String(cause)
+          }`
+        );
+      }
     }
 
-    useGenericStore().initPageSpec(true, true, true)
+    useGenericStore().initPageSpec(true, true, true);
 
     onMounted(() => {
-      precipitationStore.$reset()
-      initPrecipitation()
-    })
-    onUnmounted(() => {
-      precipitationStore.$dispose()
-    })
+      precipitationStore.$reset();
+      initPrecipitation();
+    });
+    onBeforeUnmount(() => controller?.abort());
 
     return {
       showToolbar,
       refreshPrecipitation,
-      initialized
-    }
-  }
+      initialized,
+    };
+  },
 });
 </script>
+
+<style scoped>
+.precipitation-page {
+  height: 100dvh;
+  min-height: 600px;
+}
+
+.precipitation-toolbar {
+  min-height: 68px;
+  padding-right: 160px;
+  padding-left: 76px;
+  color: inherit;
+  background: var(--swos-surface-soft);
+}
+
+@media (max-width: 600px) {
+  .precipitation-toolbar {
+    min-height: 112px;
+    padding: 58px 12px 8px;
+  }
+}
+</style>

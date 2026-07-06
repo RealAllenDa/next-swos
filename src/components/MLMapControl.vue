@@ -1,16 +1,15 @@
 <template>
-  <div ref="root"
-       class="non-selectable maplibregl-ctrl">
+  <div ref="root" class="non-selectable maplibregl-ctrl">
     <slot></slot>
   </div>
 </template>
 
 <script lang="ts">
-import {defineComponent, ref} from 'vue';
-import {Map} from 'maplibre-gl';
+import { defineComponent, ref } from 'vue';
+import { Map } from 'maplibre-gl';
 
 export default defineComponent({
-  name: 'MapLegends',
+  name: 'MLMapControl',
   setup() {
     const root = ref<HTMLElement>();
 
@@ -21,20 +20,21 @@ export default defineComponent({
       onAdd(map: Map) {
         this._map = map;
         this._container = root.value;
+        if (!this._container)
+          throw new Error('Map control container is not mounted');
         return this._container;
       }
 
       onRemove() {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        this._container!.parentNode!.removeChild(this._container!);
+        this._container?.parentNode?.removeChild(this._container);
         this._map = undefined;
       }
     }
 
     return {
       MapLegend,
-      root
-    }
-  }
-})
+      root,
+    };
+  },
+});
 </script>

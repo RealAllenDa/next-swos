@@ -1,48 +1,31 @@
 <template>
-  <q-page class="column items-stretch">
-    <WeatherWarningMap v-if="initialized" style="flex: 1;"></WeatherWarningMap>
-    <PageLoading :show="!initialized"></PageLoading>
+  <q-page class="fullscreen-map-page column items-stretch no-wrap">
+    <q-toolbar class="dashboard-title-toolbar">
+      <div>
+        <div class="text-h6">天气预警</div>
+        <div class="text-caption text-grey-7">Weather Warnings</div>
+      </div>
+    </q-toolbar>
+    <WeatherWarningMap v-if="data" style="flex: 1" />
+    <PageLoading :show="loading" />
   </q-page>
 </template>
 
-<script lang="ts">
-import {defineComponent, onMounted, onUnmounted, ref, Ref, watch} from 'vue';
+<script setup lang="ts">
+import { watch } from 'vue';
 import WeatherWarningMap from 'components/WeatherWarningMap.vue';
-import sdk from 'src/composables/sdk';
-import {useWeatherWarningStore} from 'stores/weather-warning';
 import PageLoading from 'components/PageLoading.vue';
-import {useGenericStore} from 'stores/generic';
+import { useProductionPollingFetch } from 'src/composables/use-polling-fetch';
+import { useWeatherWarningStore } from 'stores/weather-warning';
+import { useGenericStore } from 'stores/generic';
 
-export default defineComponent({
-  name: 'WeatherWarning',
-  components: {PageLoading, WeatherWarningMap},
-  setup() {
-    const initialized: Ref<boolean> = ref(false);
-    const weatherWarningStore = useWeatherWarningStore();
-
-    const {data} = sdk.useFetch<WeatherWarningList>(
-      'https://api.daziannetwork.com/warning/weather_warning',
-      true);
-    watch(data, () => {
-      if (data.value === null || data.value === undefined) {
-        sdk.showNotification('negative', 'Failed to refresh: list is null or undefined.')
-      } else {
-        weatherWarningStore.setCurrentWarningList(data.value);
-        initialized.value = true;
-      }
-    });
-
-    onMounted(() => {
-      weatherWarningStore.$reset()
-      useGenericStore().initPageSpec(false, false, false)
-    })
-    onUnmounted(() => {
-      weatherWarningStore.$dispose()
-    })
-
-    return {
-      initialized
-    }
-  }
-})
+const store = useWeatherWarningStore();
+store.$reset();
+useGenericStore().initPageSpec(false, false, false);
+const { data, loading } = useProductionPollingFetch<WeatherWarningList>(
+  '/warning/weather_warning'
+);
+watch(data, (warnings) => {
+  if (warnings) store.setCurrentWarningList(warnings);
+});
 </script>

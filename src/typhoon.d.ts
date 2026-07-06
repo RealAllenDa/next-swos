@@ -11,8 +11,8 @@ declare interface TyphoonLandDetail {
   land_info: string;
   land_address: string;
   land_time: string;
-  latitude: string; // FIXME Not present
-  longitude: string; // FIXME Not present
+  latitude?: string;
+  longitude?: string;
   level: string;
 }
 

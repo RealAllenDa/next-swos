@@ -1,185 +1,226 @@
 <template>
-  <div id="map">
-    <MapControl ref="legend" position="bottomright">
-      <div class="q-pr-sm q-pl-sm q-pt-sm q-pb-sm" style="background: white; border: 2px solid black;">
-        <WeatherWarningLegend></WeatherWarningLegend>
-      </div>
-    </MapControl>
-    <MapControl ref="detail" position="topright">
-      <div class="q-pr-sm q-pl-sm q-pt-sm q-pb-sm" style="background: white; border: 2px solid black;">
-        <WeatherWarningDetail></WeatherWarningDetail>
-      </div>
-    </MapControl>
+  <div class="weather-map-wrapper">
+    <div ref="mapContainer" class="weather-map"></div>
+    <MLMapControl ref="legend" position="bottomright">
+      <div class="map-card"><WeatherWarningLegend /></div>
+    </MLMapControl>
+    <MLMapControl ref="detail" position="topright">
+      <div class="map-card"><WeatherWarningDetail /></div>
+    </MLMapControl>
   </div>
 </template>
 
 <script lang="ts">
-import {computed, defineComponent, onMounted, ref, Ref, toRaw, watch} from 'vue';
-import {GeoJSON, Layer, LeafletMouseEvent, Map, TileLayer} from 'leaflet';
-import {useLeafletMapStore} from 'stores/map';
-import 'leaflet/dist/leaflet.css';
+import {
+  computed,
+  defineComponent,
+  markRaw,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  shallowRef,
+  watch,
+} from 'vue';
+import {
+  FullscreenControl,
+  Map,
+  NavigationControl,
+  Popup,
+  ScaleControl,
+  type GeoJSONSource,
+} from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import type { Feature, FeatureCollection } from 'geojson';
+import { useQuasar } from 'quasar';
 import sdk from 'src/composables/sdk';
-import {Feature, GeoJsonObject} from 'geojson';
-import {useWeatherWarningStore} from 'stores/weather-warning';
-import MapControl from 'components/MapControl.vue';
+import { useWeatherWarningStore } from 'stores/weather-warning';
+import MLMapControl from 'components/MLMapControl.vue';
 import WeatherWarningLegend from 'components/WeatherWarningLegend.vue';
 import WeatherWarningDetail from 'components/WeatherWarningDetail.vue';
+import { applyBaseMapTheme, createBaseMapStyle } from 'src/maps/base-style';
 
 export default defineComponent({
   name: 'WeatherWarningMap',
-  components: {WeatherWarningDetail, WeatherWarningLegend, MapControl},
+  components: { WeatherWarningDetail, WeatherWarningLegend, MLMapControl },
   setup() {
-    const mapStore = useLeafletMapStore();
+    const $q = useQuasar();
     const weatherWarningStore = useWeatherWarningStore();
-    let map: Nullable<Map> = null;
-    const legend: Ref<typeof MapControl | null> = ref(null);
-    const detail: Ref<typeof MapControl | null> = ref(null);
-
-    const warningLayer: Ref<Nullable<GeoJSON>> = ref();
-    const weatherWarningList = computed(() => {
-      return weatherWarningStore.currentWarningList
+    const mapContainer = ref<HTMLElement>();
+    const map = shallowRef<Map>();
+    const legend = ref<InstanceType<typeof MLMapControl>>();
+    const detail = ref<InstanceType<typeof MLMapControl>>();
+    const geoJson = ref<FeatureCollection | null>(null);
+    const hoverPopup = new Popup({
+      closeButton: false,
+      closeOnClick: false,
+      offset: 8,
     });
-    const centralDistricts = ['黄浦区', '徐汇区', '长宁区', '静安区',
-      '普陀区', '闸北区', '虹口区', '杨浦区'];
-    const defaultStyle = {
-      fillColor: 'white',
-      color: '#7F7F7F',
-      weight: 1,
-      fillOpacity: 1
-    }
-    const parseLevel = weatherWarningStore.parseLevel;
+    const centralDistricts = [
+      '黄浦区',
+      '徐汇区',
+      '长宁区',
+      '静安区',
+      '普陀区',
+      '闸北区',
+      '虹口区',
+      '杨浦区',
+    ];
+    const warningList = computed(() => weatherWarningStore.currentWarningList);
 
-    const {data} = sdk.useFetch<GeoJsonObject>('https://earthquake.daziannetwork.com/shanghai.geojson', true)
-    watch(data, () => {
-      if (data.value === undefined || data.value === null ||
-        map === undefined || map === null ||
-        warningLayer.value === undefined || warningLayer.value === null) {
-        return;
-      }
-      warningLayer.value.addData(data.value)
-    })
-
-    function getStyle(feature: Feature | undefined) {
-      if (feature === undefined) {
-        return defaultStyle;
-      }
-      let color = '#c8c8cb'
-      let districtName = feature.properties?.name
-      if (centralDistricts.includes(feature.properties?.name)) {
-        districtName = '上海市'
-      }
-      switch (weatherWarningList.value.coloring[districtName]) {
-        case 0:
-          color = '#c8c8cb'
-          break
-        case 1:
-          color = '#41A0F8'
-          break
-        case 2:
-          color = '#F3E843'
-          break
-        case 3:
-          color = '#F8A931'
-          break
-        case 4:
-          color = '#F74E3B'
-          break
-      }
-      if (feature.properties?.parent.adcode === 310000) {
-        // Is Shanghai
-        return {
-          fillColor: color,
-          color: 'black',
-          weight: 1,
-          fillOpacity: 1
-        }
-      } else {
-        return defaultStyle
-      }
+    function districtName(feature: Feature): string {
+      const name = String(feature.properties?.name ?? '');
+      return centralDistricts.includes(name) ? '上海市' : name;
     }
 
-
-    function clickedOnLayer(e: LeafletMouseEvent) {
-      let districtName = e.target.feature.properties.name;
-      if (centralDistricts.includes(districtName)) {
-        districtName = '上海市'
-      }
-      weatherWarningStore.currentSelectedDistrict = districtName;
+    function styledGeoJson(): FeatureCollection {
+      if (!geoJson.value) return { type: 'FeatureCollection', features: [] };
+      const collection = JSON.parse(
+        JSON.stringify(geoJson.value)
+      ) as FeatureCollection;
+      collection.features = collection.features.filter(
+        (feature) => !['江苏省', '浙江省'].includes(districtName(feature))
+      );
+      collection.features.forEach((feature) => {
+        feature.properties ??= {};
+        feature.properties.warningLevel =
+          warningList.value.coloring?.[districtName(feature)] ?? 0;
+      });
+      return collection;
     }
 
-    function getLayerHoverData(feature: Feature) {
-      // It's a very ugly function - :<
-      // I couldn't figure out another way to do that.
-      // (Of course, without instantiating another Vue instance,
-      // use some interesting component hack to make it display
-      // content of a component.)
-      let districtName;
-      if (centralDistricts.includes(feature.properties?.name)) {
-        districtName = '上海市'
-      } else {
-        districtName = feature.properties?.name;
-      }
-
-      const warnings: string[] = [];
-      if (Object.keys(weatherWarningList.value.districts).includes(districtName)) {
-        const weatherWarning = weatherWarningList.value.districts[districtName];
-        weatherWarning.forEach(warning => {
-          warnings.push(`
-            <div class="q-mt-xs text-center text-subtitle1 warning-${warning.level} warning-wrapper q-pl-xs q-pr-xs">
-                ${warning.type}${parseLevel(warning.level)}预警
-            </div>`
-          )
-        })
-      } else {
-        warnings.push(`
-            <div class="text-center text-subtitle1 warning-0 warning-wrapper q-pl-xs q-pr-xs">
-               无预警
-            </div>`
-        )
-      }
-      return `<div class="text-h6 text-center">${districtName}</div>${warnings.join('')}`
+    function refreshWarnings() {
+      const source = map.value?.getSource('warning-districts') as
+        | GeoJSONSource
+        | undefined;
+      source?.setData(styledGeoJson());
     }
 
-    function onEachFeature(feature: Feature, layer: Layer) {
-      if (map === undefined || map === null) {
-        return;
-      }
-      layer.on({
-        click: clickedOnLayer
-      })
-      // Make sure that .addTo(map) is added!
-      layer.bindTooltip(getLayerHoverData(feature), {
-        sticky: true,
-        direction: 'top'
-      }).addTo(map);
+    function addLayers() {
+      const currentMap = map.value;
+      if (!currentMap) return;
+      currentMap.addSource('warning-districts', {
+        type: 'geojson',
+        data: styledGeoJson(),
+      });
+      currentMap.addLayer({
+        id: 'warning-fill',
+        type: 'fill',
+        source: 'warning-districts',
+        paint: {
+          'fill-color': [
+            'match',
+            ['get', 'warningLevel'],
+            1,
+            '#41a0f8',
+            2,
+            '#f3e843',
+            3,
+            '#f8a931',
+            4,
+            '#f74e3b',
+            '#c8c8cb',
+          ],
+          'fill-opacity': 0.78,
+        },
+      });
+      currentMap.addLayer({
+        id: 'warning-outline',
+        type: 'line',
+        source: 'warning-districts',
+        paint: { 'line-color': '#27272a', 'line-width': 1 },
+      });
+
+      currentMap.on('mousemove', 'warning-fill', (event) => {
+        currentMap.getCanvas().style.cursor = 'pointer';
+        const feature = event.features?.[0];
+        if (!feature) return;
+        const name = districtName(feature);
+        const warnings = warningList.value.districts?.[name] ?? [];
+        const wrapper = document.createElement('div');
+        const title = document.createElement('strong');
+        title.textContent = name;
+        wrapper.append(title);
+        warnings.forEach((warning) => {
+          const row = document.createElement('div');
+          row.textContent = `${warning.type}${weatherWarningStore.parseLevel(
+            warning.level
+          )}预警`;
+          wrapper.append(row);
+        });
+        if (warnings.length === 0)
+          wrapper.append(document.createTextNode(' · 无预警'));
+        hoverPopup
+          .setLngLat(event.lngLat)
+          .setDOMContent(wrapper)
+          .addTo(currentMap);
+      });
+      currentMap.on('click', 'warning-fill', (event) => {
+        const feature = event.features?.[0];
+        if (!feature) return;
+        weatherWarningStore.currentSelectedDistrict = districtName(feature);
+      });
+      currentMap.on('mouseleave', 'warning-fill', () => {
+        currentMap.getCanvas().style.cursor = '';
+        hoverPopup.remove();
+      });
     }
+
+    const { data: geography } = sdk.useFetch<FeatureCollection>(
+      `${sdk.productionApiUrl}/assets/generic/around_shanghai_geojson`,
+      true
+    );
+    watch(geography, (value) => {
+      if (!value) return;
+      geoJson.value = value;
+      refreshWarnings();
+    });
+    watch(warningList, refreshWarnings, { deep: true });
 
     onMounted(() => {
-      map = new Map('map', mapStore.options);
-      // TODO: Replace in future
-      new TileLayer('https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}')
-        .addTo(map)
-      warningLayer.value = new GeoJSON(undefined, {
-        style: getStyle,
-        onEachFeature: onEachFeature
-      }).addTo(toRaw(map))
-
-      legend.value?.addToMap(map);
-      detail.value?.addToMap(map);
+      if (!mapContainer.value) return;
+      map.value = markRaw(
+        new Map({
+          container: mapContainer.value,
+          style: createBaseMapStyle($q.dark.isActive),
+          center: [121.51, 31.26],
+          zoom: 8.8,
+        })
+      );
+      map.value.addControl(new NavigationControl(), 'top-left');
+      map.value.addControl(new FullscreenControl(), 'top-left');
+      map.value.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left');
+      map.value.once('load', () => {
+        addLayers();
+        if (legend.value)
+          map.value?.addControl(new legend.value.MapLegend(), 'bottom-right');
+        if (detail.value)
+          map.value?.addControl(new detail.value.MapLegend(), 'top-right');
+      });
     });
 
-    return {
-      map,
-      legend,
-      detail
-    };
-  }
-})
+    watch(
+      () => $q.dark.isActive,
+      (dark) => applyBaseMapTheme(map.value, dark)
+    );
+
+    onBeforeUnmount(() => map.value?.remove());
+    return { mapContainer, legend, detail };
+  },
+});
 </script>
 
-<style>
-#map {
+<style scoped>
+.weather-map-wrapper,
+.weather-map {
   width: 100%;
-  z-index: 1;
+  height: 100%;
+  min-height: 0;
+}
+
+.map-card {
+  max-width: 360px;
+  padding: 12px;
+  border: 1px solid var(--swos-border);
+  background: var(--swos-map-card);
 }
 </style>

@@ -1,575 +1,484 @@
 <template>
-  <div id="map">
-    <MapControl ref="typhoonDetail" :disable-click-propagation="true"
-                :disable-scroll-propagation="true"
-                position="topright">
-      <TyphoonSelection></TyphoonSelection>
-    </MapControl>
+  <div class="typhoon-map-wrapper">
+    <div ref="mapContainer" class="typhoon-map"></div>
+    <MLMapControl ref="typhoonDetail">
+      <TyphoonDetail />
+    </MLMapControl>
   </div>
 </template>
 
 <script lang="ts">
-import {computed, defineComponent, onMounted, ref, Ref, watch} from 'vue';
-import 'leaflet/dist/leaflet.css';
-import {CircleMarker, DivIcon, FeatureGroup, LatLng, LatLngExpression, Map, Marker, Polyline, TileLayer} from 'leaflet'
-import {useTyphoonStore} from 'stores/typhoon';
-import {Semicircle} from '@mirei/leaflet-semicircle-ts';
-import MapControl from 'components/MapControl.vue';
-import TyphoonSelection from 'components/TyphoonDetail.vue';
-import sdk from 'src/composables/sdk';
+import {
+  computed,
+  defineComponent,
+  markRaw,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  shallowRef,
+  watch,
+} from 'vue';
+import {
+  FullscreenControl,
+  LngLatBounds,
+  Map,
+  NavigationControl,
+  Popup,
+  ScaleControl,
+  type CircleLayerSpecification,
+  type GeoJSONSource,
+  type MapLayerMouseEvent,
+} from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { useQuasar } from 'quasar';
+import type { FeatureCollection, LineString, Point, Polygon } from 'geojson';
+import { useTyphoonStore } from 'stores/typhoon';
+import MLMapControl from 'components/MLMapControl.vue';
+import TyphoonDetail from 'components/TyphoonDetail.vue';
+import { applyBaseMapTheme, createBaseMapStyle } from 'src/maps/base-style';
+
+interface TyphoonMapData {
+  nowcastPoints: FeatureCollection<Point>;
+  forecastPoints: FeatureCollection<Point>;
+  nowcastLines: FeatureCollection<LineString>;
+  forecastLines: FeatureCollection<LineString>;
+  windAreas: FeatureCollection<Polygon>;
+}
 
 export default defineComponent({
-  components: {TyphoonSelection, MapControl},
+  name: 'TyphoonMap',
+  components: { TyphoonDetail, MLMapControl },
   setup() {
-    const typhoonStore = useTyphoonStore();
-    const typhoonDetail: Ref<typeof MapControl | null> = ref(null);
-    const map: Ref<Nullable<Map>> = ref();
-
-    const currentTyphoons = computed(() => {
-      return typhoonStore.currentTyphoons
+    const $q = useQuasar();
+    const store = useTyphoonStore();
+    const mapContainer = ref<HTMLElement>();
+    const map = shallowRef<Map>();
+    const hoverPopup = new Popup({
+      closeButton: false,
+      closeOnClick: false,
+      offset: 10,
     });
+    const typhoonDetail = ref<InstanceType<typeof MLMapControl>>();
+    const currentTyphoons = computed(() => store.currentTyphoons);
+    const forecastOrigins = computed(() => store.showTyphoonForecastOrigins);
+    const currentIndex = computed(() => store.currentTyphoonIndex);
 
-    // Utility
-    function getFillColor(point: string): string {
-      let color: string;
-      switch (point) {
-        case '热带低压(TD)':
-          color = '#00D5CB';
-          break;
-        case '热带低气压(TD)':
-          color = '#00D5CB';
-          break;
-        case '热带风暴(TS)':
-          color = '#FCFA00';
-          break;
-        case '强热带风暴(STS)':
-          color = '#FDAE0D';
-          break;
-        case '台风(TY)':
-          color = '#FB3B00';
-          break;
-        case '强台风(STY)':
-          color = '#FC4D80';
-          break;
-        case '超强台风(Super TY)':
-          color = '#C2218E';
-          break;
-        default:
-          color = '#ffffff'
-      }
-      return color;
+    function emptyCollection<
+      G extends Point | LineString | Polygon
+    >(): FeatureCollection<G> {
+      return { type: 'FeatureCollection', features: [] };
     }
 
-    function getForecastLineColor(origin: string): string {
-      let color: string;
-      switch (origin) {
-        case '中国':
-          color = '#ff0000';
-          break;
-        case '日本':
-          color = '#2BBE00';
-          break;
-        case '中国香港':
-          color = '#fe9104';
-          break;
-        case '中国台湾':
-          color = '#FF00FF';
-          break;
-        case '美国':
-          color = '#11f7f7';
-          break;
-        default:
-          color = '#ffffff'
-      }
-      return color;
+    function strengthColor(strength: string): string {
+      if (strength.includes('Super') || strength.includes('超强'))
+        return '#c2218e';
+      if (strength.includes('STY') || strength.includes('强台风'))
+        return '#fc4d80';
+      if (strength.includes('TY') || strength.includes('台风'))
+        return '#fb3b00';
+      if (strength.includes('STS') || strength.includes('强热带风暴'))
+        return '#fdae0d';
+      if (strength.includes('TS') || strength.includes('热带风暴'))
+        return '#fcfa00';
+      if (strength.includes('TD') || strength.includes('热带低压'))
+        return '#00d5cb';
+      return '#fff';
     }
 
-    // Land Info
-    const landInfoLayer: Ref<Nullable<FeatureGroup>> = ref();
-
-    function drawLandPoint() {
-      if (map.value === null || map.value === undefined ||
-        landInfoLayer.value === null || landInfoLayer.value === undefined) {
-        return;
-      }
-      return;
-
-      landInfoLayer.value.clearLayers()
-
-      for (const i in currentTyphoons.value) {
-        const landInfo = currentTyphoons.value[i].land;
-        landInfo.forEach(land => {
-          const icon = new DivIcon({
-            iconAnchor: [20, 20],
-            html: `<div class="dot">
-            <div class="ring"></div>
-            <div class="land-icon" style="border-bottom: 11px solid ${getFillColor(land.level)};"></div></div>`,
-            className: 'attention-icon',
-          });
-          const pointLayer = new Marker([parseFloat(land.latitude), parseFloat(land.longitude)], {
-            icon: icon,
-            pane: 'tooltipPane'
-          });
-          landInfoLayer.value?.addLayer(pointLayer)
-        });
-      }
+    function originColor(origin: string): string {
+      const colors: Record<string, string> = {
+        中国: '#ef4444',
+        日本: '#22c55e',
+        中国香港: '#f59e0b',
+        中国台湾: '#e879f9',
+        美国: '#22d3ee',
+      };
+      return colors[origin] ?? '#fff';
     }
 
-    // Forecast & Current Points
-    const typhoonNowcastPolyline: Ref<{ [id: string]: LatLng[] }> = ref({});
-    const typhoonForecasts: Ref<{ [id: string]: TyphoonPoints }> = ref({});
-
-    const forecastPointsLayer: Ref<Nullable<FeatureGroup>> = ref();
-    const nowcastPointLayer: Ref<Nullable<FeatureGroup>> = ref();
-
-    const enableForecastOrigin = computed(() => typhoonStore.showTyphoonForecastOrigins);
-    const currentTyphoonIndex = computed(() => {
-      if (typhoonStore.currentTyphoonIndex >= 0) {
-        return typhoonStore.currentTyphoonIndex;
-      } else {
-        return typhoonStore.currentTyphoonIndex + 9999;
-      }
-    });
-
-    function drawNowcastPoints() {
-      if (map.value === null || map.value === undefined ||
-        nowcastPointLayer.value === null || nowcastPointLayer.value === undefined) {
-        return;
-      }
-      typhoonForecasts.value = {};
-      typhoonNowcastPolyline.value = {};
-
-      nowcastPointLayer.value.clearLayers();
-
-      for (const i in currentTyphoons.value) {
-        const typhoonPoints = currentTyphoons.value[i].points;
-        typhoonPoints.forEach((point, index) => {
-          if (!Object.keys(typhoonNowcastPolyline.value).includes(i)) {
-            typhoonNowcastPolyline.value[i] = [];
-          }
-          typhoonNowcastPolyline.value[i].push(new LatLng(parseFloat(point.latitude), parseFloat(point.longitude)));
-
-          const isCurrent = index === typhoonPoints.length - (currentTyphoonIndex.value + 1);
-          let pointLayer;
-          if (isCurrent) {
-            const icon = new DivIcon({
-              iconAnchor: [20, 20],
-              html: `<div class="dot">
-            <div class="ring"></div>
-            <div class="icon" style="background: ${getFillColor(point.strong)}"></div></div>`,
-              className: 'attention-icon',
-            });
-            pointLayer = new Marker([parseFloat(point.latitude), parseFloat(point.longitude)], {
-              icon: icon,
-              pane: 'tooltipPane'
-            });
-          } else {
-            pointLayer = new CircleMarker([parseFloat(point.latitude), parseFloat(point.longitude)], {
-              radius: 6,
-              fillColor: getFillColor(point.strong),
-              stroke: true,
-              weight: 2,
-              color: '#353433',
-              fillOpacity: 1,
-              pane: 'markerPane'
-            })
-          }
-          nowcastPointLayer.value?.addLayer(pointLayer);
-          if (index === 0) {
-            // First point
-            pointLayer.bindTooltip(`${i}${currentTyphoons.value[i].name}`, {
-              direction: 'right',
-              permanent: true,
-              opacity: 1,
-              offset: [10, 0]
-            })
-          } else if (isCurrent) {
-            // Last point
-            typhoonForecasts.value[i] = point;
-          }
-        })
-      }
+    function coordinate(point: {
+      longitude: string;
+      latitude: string;
+    }): [number, number] {
+      return [Number(point.longitude), Number(point.latitude)];
     }
 
-    const typhoonForecastsPolyline: Ref<{ [id: string]: { [forecastName: string]: LatLng[] } }> = ref({});
+    function destination(
+      center: [number, number],
+      radiusKm: number,
+      bearing: number
+    ): [number, number] {
+      const angular = radiusKm / 6371;
+      const bearingRadians = (bearing * Math.PI) / 180;
+      const latitude = (center[1] * Math.PI) / 180;
+      const longitude = (center[0] * Math.PI) / 180;
+      const resultLatitude = Math.asin(
+        Math.sin(latitude) * Math.cos(angular) +
+          Math.cos(latitude) * Math.sin(angular) * Math.cos(bearingRadians)
+      );
+      const resultLongitude =
+        longitude +
+        Math.atan2(
+          Math.sin(bearingRadians) * Math.sin(angular) * Math.cos(latitude),
+          Math.cos(angular) - Math.sin(latitude) * Math.sin(resultLatitude)
+        );
+      return [
+        (resultLongitude * 180) / Math.PI,
+        (resultLatitude * 180) / Math.PI,
+      ];
+    }
 
-    function drawForecastPoints() {
-      if (map.value === null || map.value === undefined ||
-        forecastPointsLayer.value === null || forecastPointsLayer.value === undefined) {
-        return;
-      }
-
-      typhoonForecastsPolyline.value = {};
-      forecastPointsLayer.value.clearLayers();
-
-      if (Object.keys(typhoonForecasts.value).length === 0) {
-        return;
-      }
-
-      for (const i in typhoonForecasts.value) {
-        const content = typhoonForecasts.value[i];
-        if (!Object.keys(typhoonForecastsPolyline).includes(i)) {
-          typhoonForecastsPolyline.value[i] = {};
+    function addWindQuadrants(
+      collection: FeatureCollection<Polygon>,
+      center: [number, number],
+      radius: TyphoonWindRadius,
+      windLevel: number
+    ) {
+      if (!radius) return;
+      const quadrants = [
+        { start: 0, radius: radius.ne },
+        { start: 90, radius: radius.se },
+        { start: 180, radius: radius.sw },
+        { start: 270, radius: radius.nw },
+      ];
+      quadrants.forEach((quadrant) => {
+        if (!Number.isFinite(quadrant.radius) || quadrant.radius <= 0) return;
+        const coordinates: [number, number][] = [center];
+        for (
+          let bearing = quadrant.start;
+          bearing <= quadrant.start + 90;
+          bearing += 5
+        ) {
+          coordinates.push(destination(center, quadrant.radius, bearing));
         }
-        if (content.forecast === null) {
-          continue;
-        }
-        content.forecast.forEach((forecast) => {
-          if (enableForecastOrigin.value.includes(forecast.sets)) {
-            if (!Object.keys(typhoonForecastsPolyline.value[i]).includes(forecast.sets)) {
-              // include the last point of the nowcast
-              typhoonForecastsPolyline.value[i][forecast.sets] = [
-                typhoonNowcastPolyline.value[i][typhoonNowcastPolyline.value[i].length - 1]
-              ];
-            }
-            forecast.points.forEach((point, index) => {
-              const isCurrent = index === forecast.points.length + (currentTyphoonIndex.value - 9999);
-              let pointLayer;
-              if (isCurrent) {
-                const icon = new DivIcon({
-                  iconAnchor: [20, 20],
-                  html: `<div class="dot">
-            <div class="ring"></div>
-            <div class="icon" style="background: ${getFillColor(point.strong)}"></div></div>`,
-                  className: 'attention-icon',
-                });
-                pointLayer = new Marker([parseFloat(point.latitude), parseFloat(point.longitude)], {
-                  icon: icon,
-                  pane: 'tooltipPane'
-                });
-              } else {
-                pointLayer = new CircleMarker([parseFloat(point.latitude), parseFloat(point.longitude)], {
-                  radius: 6,
-                  fillColor: getFillColor(point.strong),
-                  stroke: true,
-                  weight: 2,
-                  color: '#353433',
-                  fillOpacity: 1,
-                  pane: 'markerPane'
-                })
-              }
-              forecastPointsLayer.value?.addLayer(pointLayer);
-              typhoonForecastsPolyline.value[i][forecast.sets].push(
-                new LatLng(parseFloat(point.latitude), parseFloat(point.longitude))
-              )
-            })
-          }
+        coordinates.push(center);
+        collection.features.push({
+          type: 'Feature',
+          geometry: { type: 'Polygon', coordinates: [coordinates] },
+          properties: { windLevel },
         });
-      }
+      });
     }
 
-    // Lines
-    const nowcastLineLayer: Ref<Nullable<FeatureGroup>> = ref();
-    const forecastLineLayer: Ref<Nullable<FeatureGroup>> = ref();
+    function selectedNowcastPoint(
+      detail: TyphoonDetail
+    ): TyphoonPoints | undefined {
+      if (currentIndex.value < 0)
+        return detail.points[detail.points.length - 1];
+      return detail.points[detail.points.length - 1 - currentIndex.value];
+    }
 
-    function drawNowcastLine() {
-      if (map.value === null || map.value === undefined ||
-        nowcastLineLayer.value === null || nowcastLineLayer.value === undefined) {
-        return;
-      }
-      nowcastLineLayer.value.clearLayers();
-      for (const i in typhoonNowcastPolyline.value) {
-        const polyline = typhoonNowcastPolyline.value[i]
-        if (polyline.length === 0) {
+    function buildMapData(): TyphoonMapData {
+      const result: TyphoonMapData = {
+        nowcastPoints: emptyCollection<Point>(),
+        forecastPoints: emptyCollection<Point>(),
+        nowcastLines: emptyCollection<LineString>(),
+        forecastLines: emptyCollection<LineString>(),
+        windAreas: emptyCollection<Polygon>(),
+      };
+
+      Object.entries(currentTyphoons.value).forEach(([id, detail]) => {
+        const nowcastCoordinates = detail.points
+          .map(coordinate)
+          .filter(
+            ([longitude, latitude]) =>
+              Number.isFinite(longitude) && Number.isFinite(latitude)
+          );
+        detail.points.forEach((point, index) => {
+          const selected =
+            currentIndex.value >= 0 &&
+            index === detail.points.length - 1 - currentIndex.value;
+          result.nowcastPoints.features.push({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: coordinate(point) },
+            properties: {
+              id,
+              name: detail.name,
+              strength: point.strong,
+              color: strengthColor(point.strong),
+              selected,
+              time: point.time,
+            },
+          });
+        });
+        if (nowcastCoordinates.length > 1) {
+          result.nowcastLines.features.push({
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: nowcastCoordinates },
+            properties: { id },
+          });
+        }
+
+        const lastPoint = detail.points[detail.points.length - 1];
+        if (!lastPoint) return;
+        (lastPoint.forecast ?? []).forEach((forecast) => {
+          if (!forecastOrigins.value.includes(forecast.sets)) return;
+          const forecastPoints = forecast.points.filter(
+            (point) =>
+              point.time !== lastPoint.time ||
+              point.latitude !== lastPoint.latitude ||
+              point.longitude !== lastPoint.longitude
+          );
+          const lineCoordinates = [
+            coordinate(lastPoint),
+            ...forecastPoints.map(coordinate),
+          ];
+          forecastPoints.forEach((point, index) => {
+            result.forecastPoints.features.push({
+              type: 'Feature',
+              geometry: { type: 'Point', coordinates: coordinate(point) },
+              properties: {
+                id,
+                name: detail.name,
+                origin: forecast.sets,
+                strength: point.strong,
+                color: strengthColor(point.strong),
+                selected:
+                  currentIndex.value < 0 &&
+                  index === Math.abs(currentIndex.value) - 1,
+                time: point.time,
+              },
+            });
+          });
+          result.forecastLines.features.push({
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: lineCoordinates },
+            properties: {
+              id,
+              origin: forecast.sets,
+              color: originColor(forecast.sets),
+            },
+          });
+        });
+
+        const selected = selectedNowcastPoint(detail);
+        if (selected) {
+          const center = coordinate(selected);
+          addWindQuadrants(result.windAreas, center, selected.radius7_quad, 7);
+          addWindQuadrants(
+            result.windAreas,
+            center,
+            selected.radius10_quad,
+            10
+          );
+          addWindQuadrants(
+            result.windAreas,
+            center,
+            selected.radius12_quad,
+            12
+          );
+        }
+      });
+      return result;
+    }
+
+    function setSourceData(id: keyof TyphoonMapData, data: FeatureCollection) {
+      (map.value?.getSource(id) as GeoJSONSource | undefined)?.setData(data);
+    }
+
+    function fitData(data: TyphoonMapData) {
+      if (!map.value) return;
+      const coordinates = [
+        ...data.nowcastPoints.features,
+        ...data.forecastPoints.features,
+      ].map((feature) => feature.geometry.coordinates as [number, number]);
+      if (coordinates.length === 0) return;
+      const bounds = coordinates.reduce(
+        (result, point) => result.extend(point),
+        new LngLatBounds(coordinates[0], coordinates[0])
+      );
+      map.value.fitBounds(bounds, { padding: 80, maxZoom: 8, duration: 500 });
+    }
+
+    function refreshLayers(fit = false) {
+      if (!map.value?.isStyleLoaded()) return;
+      const data = buildMapData();
+      setSourceData('nowcastPoints', data.nowcastPoints);
+      setSourceData('forecastPoints', data.forecastPoints);
+      setSourceData('nowcastLines', data.nowcastLines);
+      setSourceData('forecastLines', data.forecastLines);
+      setSourceData('windAreas', data.windAreas);
+      if (fit) fitData(data);
+    }
+
+    function addLayers() {
+      const currentMap = map.value;
+      if (!currentMap) return;
+      const data = buildMapData();
+      Object.entries(data).forEach(([id, collection]) =>
+        currentMap.addSource(id, { type: 'geojson', data: collection })
+      );
+      currentMap.addSource('attention-lines', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [127, 34],
+                  [127, 22],
+                  [110, 15],
+                ],
+              },
+              properties: { color: '#fde047' },
+            },
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [132, 34],
+                  [132, 22],
+                  [125, 15],
+                  [110, 15],
+                ],
+              },
+              properties: { color: '#7dd3fc' },
+            },
+          ],
+        },
+      });
+      currentMap.addLayer({
+        id: 'wind-areas',
+        type: 'fill',
+        source: 'windAreas',
+        paint: {
+          'fill-color': [
+            'match',
+            ['get', 'windLevel'],
+            7,
+            '#fff500',
+            10,
+            '#ff4600',
+            12,
+            '#b40068',
+            '#fff',
+          ],
+          'fill-opacity': 0.25,
+        },
+      });
+      currentMap.addLayer({
+        id: 'attention-lines',
+        type: 'line',
+        source: 'attention-lines',
+        paint: { 'line-color': ['get', 'color'], 'line-width': 1 },
+      });
+      currentMap.addLayer({
+        id: 'nowcast-lines',
+        type: 'line',
+        source: 'nowcastLines',
+        paint: { 'line-color': '#fff', 'line-width': 3 },
+      });
+      currentMap.addLayer({
+        id: 'forecast-lines',
+        type: 'line',
+        source: 'forecastLines',
+        paint: {
+          'line-color': ['get', 'color'],
+          'line-width': 2,
+          'line-dasharray': [3, 2],
+        },
+      });
+      const pointPaint: CircleLayerSpecification['paint'] = {
+        'circle-color': ['get', 'color'],
+        'circle-radius': [
+          'case',
+          ['boolean', ['get', 'selected'], false],
+          10,
+          6,
+        ],
+        'circle-stroke-color': '#27272a',
+        'circle-stroke-width': [
+          'case',
+          ['boolean', ['get', 'selected'], false],
+          4,
+          2,
+        ],
+      };
+      currentMap.addLayer({
+        id: 'nowcast-points',
+        type: 'circle',
+        source: 'nowcastPoints',
+        paint: pointPaint,
+      });
+      currentMap.addLayer({
+        id: 'forecast-points',
+        type: 'circle',
+        source: 'forecastPoints',
+        paint: pointPaint,
+      });
+
+      const showPopup = (event: MapLayerMouseEvent) => {
+        const feature = event.features?.[0];
+        if (!feature) {
+          currentMap.getCanvas().style.cursor = '';
+          hoverPopup.remove();
           return;
         }
-        new Polyline(polyline, {
-          color: 'white'
-        }).addTo(nowcastLineLayer.value)
-      }
+        currentMap.getCanvas().style.cursor = 'pointer';
+        const content = document.createElement('div');
+        content.textContent = `${feature.properties.name} · ${feature.properties.time} · ${feature.properties.strength}`;
+        hoverPopup
+          .setLngLat(event.lngLat)
+          .setDOMContent(content)
+          .addTo(currentMap);
+      };
+      currentMap.on('mousemove', 'nowcast-points', showPopup);
+      currentMap.on('mousemove', 'forecast-points', showPopup);
+      const hidePopup = () => {
+        currentMap.getCanvas().style.cursor = '';
+        hoverPopup.remove();
+      };
+      currentMap.on('mouseleave', 'nowcast-points', hidePopup);
+      currentMap.on('mouseleave', 'forecast-points', hidePopup);
+      fitData(data);
     }
 
-    function drawForecastLine() {
-      if (map.value === null || map.value === undefined ||
-        forecastLineLayer.value === null || forecastLineLayer.value === undefined) {
-        return;
-      }
-      forecastLineLayer.value.clearLayers();
-      for (const i in typhoonForecastsPolyline.value) {
-        for (const j in typhoonForecastsPolyline.value[i]) {
-          const polyline = typhoonForecastsPolyline.value[i][j];
-          if (polyline.length === 0) {
-            return;
-          }
-          new Polyline(polyline, {
-            color: getForecastLineColor(j),
-            dashArray: '5'
-          }).addTo(forecastLineLayer.value)
-        }
-      }
-    }
-
-    // Strength Circle
-    // Circle shape:
-    //    1      |      2
-    //    3      |      4
-
-    // Data shape
-    // 2ne | 4se | 1nw | 3sw
-    const strengthCircleLayer: Ref<Nullable<FeatureGroup>> = ref();
-
-    function drawStrength(circle: TyphoonWindRadius, latLng: LatLngExpression, strength: number) {
-      const circles = [circle.ne, circle.se, circle.nw, circle.sw];
-      let color = 'white', opacity = 0.1;
-      if (strength === 7) {
-        color = '#fff500';
-        opacity = 0.5
-      } else if (strength === 10) {
-        color = '#ff4600';
-        opacity = 0.7
-      } else if (strength === 12) {
-        color = '#b40068';
-        opacity = 0.8
-      } else {
-        sdk.showNotification('negative', 'Failed to draw typhoon circle: Color unknown');
-        return;
-      }
-      circles.forEach((radius: number, i: number) => {
-        let index = i;
-        if (i === 2) {
-          index++;
-        } else if (i === 3) {
-          index--;
-        }
-
-        const circle = new Semicircle(latLng, {
-          radius: radius * 1000,
-          startAngle: index * 90,
-          stopAngle: (index + 1) * 90,
-          fillColor: color,
-          fillOpacity: opacity,
-          stroke: false
-        });
-        strengthCircleLayer.value?.addLayer(circle);
-      })
-    }
-
-    function drawStrengthCircle() {
-      if (map.value === null || map.value === undefined ||
-        strengthCircleLayer.value === null || strengthCircleLayer.value === undefined) {
-        return;
-      }
-      strengthCircleLayer.value.clearLayers();
-      for (const i in currentTyphoons.value) {
-        const currentTyphoonPoint = currentTyphoons.value[i].points[
-        currentTyphoons.value[i].points.length - (currentTyphoonIndex.value + 1)
-          ];
-        // noinspection JSIncompatibleTypesComparison
-        if (currentTyphoonPoint === undefined) {
-          break;
-        }
-        drawStrength(
-          currentTyphoonPoint.radius7_quad,
-          [parseFloat(currentTyphoonPoint.latitude), parseFloat(currentTyphoonPoint.longitude)],
-          7
-        );
-        drawStrength(
-          currentTyphoonPoint.radius10_quad,
-          [parseFloat(currentTyphoonPoint.latitude), parseFloat(currentTyphoonPoint.longitude)],
-          10
-        );
-        drawStrength(
-          currentTyphoonPoint.radius12_quad,
-          [parseFloat(currentTyphoonPoint.latitude), parseFloat(currentTyphoonPoint.longitude)],
-          12
-        );
-      }
-    }
-
-    // Attention Line
-    function addAttentionLine() {
-      if (map.value === null || map.value === undefined) {
-        return;
-      }
-      const HOUR_24_ATTENTION_LINE = [
-        new LatLng(34, 127),
-        new LatLng(22, 127),
-        new LatLng(15, 110)
-      ];
-      const HOUR_48_ATTENTION_LINE = [
-        new LatLng(34, 132),
-        new LatLng(22, 132),
-        new LatLng(15, 125),
-        new LatLng(15, 110)
-      ];
-      new Polyline(HOUR_24_ATTENTION_LINE, {color: 'yellow', weight: 1}).addTo(map.value);
-      new Polyline(HOUR_48_ATTENTION_LINE, {color: 'lightblue', weight: 1}).addTo(map.value);
-      let attention24HourIcon = new DivIcon({
-        iconAnchor: [5, -50],
-        html: '<span style=\'color: yellow\'>24<br>小<br>时<br>警<br>戒<br>线</span>',
-        iconSize: [30, 30],
-        className: 'attention-icon',
-      });
-      let attention48HourIcon = new DivIcon({
-        iconAnchor: [5, -100],
-        html: '<span style=\'color: lightblue\'>48<br>小<br>时<br>警<br>戒<br>线</span>',
-        iconSize: [30, 30],
-        className: 'attention-icon',
-      });
-      new Marker(HOUR_24_ATTENTION_LINE[0], {
-        icon: attention24HourIcon
-      }).addTo(map.value);
-      new Marker(HOUR_48_ATTENTION_LINE[0], {
-        icon: attention48HourIcon
-      }).addTo(map.value);
-    }
-
-    // Bounds
-    function fitBounds() {
-      if (map.value === null || map.value === undefined) {
-        return;
-      }
-
-      let boundsBase = nowcastPointLayer.value?.getBounds();
-      const forecastPointBounds = forecastPointsLayer.value?.getBounds();
-      const nowcastLineBounds = nowcastLineLayer.value?.getBounds();
-      const forecastLineBounds = forecastLineLayer.value?.getBounds();
-      const strengthCircleBounds = strengthCircleLayer.value?.getBounds();
-
-      if (boundsBase?.isValid()) {
-        if (forecastPointBounds?.isValid()) {
-          boundsBase.extend(forecastPointBounds);
-        }
-        if (nowcastLineBounds?.isValid()) {
-          boundsBase.extend(nowcastLineBounds);
-        }
-        if (forecastLineBounds?.isValid()) {
-          boundsBase.extend(forecastLineBounds);
-        }
-        if (strengthCircleBounds?.isValid()) {
-          boundsBase.extend(strengthCircleBounds);
-        }
-        boundsBase = boundsBase?.pad(-0.15)
-        map.value.fitBounds(boundsBase)
-      }
-    }
-
-    function redrawTyphoon() {
-      // drawNowcastPoints() shall always be the first, since other parsing depends on points.
-      drawNowcastPoints()
-      drawForecastPoints()
-
-      drawNowcastLine()
-      drawForecastLine()
-
-      drawLandPoint()
-      drawStrengthCircle()
-
-      fitBounds()
-    }
-
-    function redrawPoint() {
-      drawForecastPoints()
-    }
-
-    // Hooks
-    watch(currentTyphoons, () => {
-      redrawTyphoon()
-    })
-
-    watch(enableForecastOrigin, () => {
-      redrawTyphoon()
-    })
-
-    watch(currentTyphoonIndex, () => {
-      if (currentTyphoonIndex.value >= 999) {
-        redrawPoint()
-      } else {
-        redrawTyphoon()
-      }
-    })
+    watch(currentTyphoons, () => refreshLayers(true));
+    watch(forecastOrigins, () => refreshLayers(true));
+    watch(currentIndex, () => refreshLayers(false));
 
     onMounted(() => {
-      map.value = new Map('map', {
-        center: [31.59, 120.29],
-        zoom: 5,
-        zoomSnap: 0.01,
-        zoomDelta: 0.5
+      if (!mapContainer.value) return;
+      map.value = markRaw(
+        new Map({
+          container: mapContainer.value,
+          style: createBaseMapStyle($q.dark.isActive),
+          center: [120.29, 31.59],
+          zoom: 4.5,
+        })
+      );
+      map.value.addControl(new NavigationControl(), 'top-left');
+      map.value.addControl(new FullscreenControl(), 'top-left');
+      map.value.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left');
+      map.value.once('load', () => {
+        addLayers();
+        if (typhoonDetail.value)
+          map.value?.addControl(
+            new typhoonDetail.value.MapLegend(),
+            'top-right'
+          );
       });
-      // TODO: Replace in future
-      new TileLayer('///p1.map.gtimg.com/demTiles/{z}/1{x}/1{y}/{x}_{-y}.jpg')
-        .addTo(map.value)
-
-      forecastPointsLayer.value = new FeatureGroup().addTo(map.value);
-      nowcastPointLayer.value = new FeatureGroup().addTo(map.value);
-      forecastLineLayer.value = new FeatureGroup().addTo(map.value);
-      nowcastLineLayer.value = new FeatureGroup().addTo(map.value);
-      landInfoLayer.value = new FeatureGroup().addTo(map.value);
-      strengthCircleLayer.value = new FeatureGroup().addTo(map.value);
-
-      typhoonDetail.value?.addToMap(map.value);
-      addAttentionLine();
     });
+    watch(
+      () => $q.dark.isActive,
+      (dark) => applyBaseMapTheme(map.value, dark)
+    );
+    onBeforeUnmount(() => map.value?.remove());
 
-    return {
-      map,
-      typhoonDetail
-    };
-  }
+    return { mapContainer, typhoonDetail };
+  },
 });
 </script>
 
-<!--suppress CssNonIntegerLengthInPixels -->
-<style>
-#map {
+<style scoped>
+.typhoon-map-wrapper,
+.typhoon-map {
   width: 100%;
-  z-index: 1;
-}
-
-.attention-icon {
-  width: 0;
-  height: 0;
-  border: none;
-  background: none;
-}
-
-.dot {
-  width: 40px;
-  height: 40px;
-  pointer-events: none;
-  animation: linear infinite storm;
-}
-
-.ring {
-  position: absolute;
-  left: 10px;
-  top: 10px;
-  width: 20px;
-  height: 20px;
-  border-radius: 10px;
-  background-color: #fff;
-  box-shadow: 0 0 6px rgb(0 0 0 / 33%);
-}
-
-@keyframes storm-dot {
-  100% {
-    transform: translate(12.5px, 12.5px) scale(.875);
-  }
-}
-
-@keyframes storm {
-  100% {
-    transform: rotate(-360deg);
-  }
-}
-
-.icon {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 15px;
-  height: 15px;
-  border-radius: 7.5px;
-  transform: translate(12.5px, 12.5px);
-  animation: 1s ease-in-out infinite alternate-reverse storm-dot;
-}
-
-.land-icon {
-  width: 0;
-  height: 0;
-  border-left: 8px solid transparent;
-  border-right: 8px solid transparent;
-  border-radius: 0;
-  transform: translate(12.5px, 13.5px);
+  height: 100%;
+  min-height: 0;
 }
 </style>

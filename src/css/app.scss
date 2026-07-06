@@ -1,7 +1,124 @@
 // app global css in SCSS form
 
-$blue-warning: #41A0F8;
-$yellow-warning: #F3E843;
-$orange-warning: #F8A931;
-$red-warning: #F74E3B;
+$blue-warning: #41a0f8;
+$yellow-warning: #f3e843;
+$orange-warning: #f8a931;
+$red-warning: #f74e3b;
 $no-warning: #c8c8cb;
+
+:root {
+  color-scheme: light;
+  --swos-page: #f4f7fa;
+  --swos-surface: #ffffff;
+  --swos-surface-soft: #f8fafc;
+  --swos-border: #dce4ec;
+  --swos-text-muted: #64748b;
+  --swos-map-card: rgb(255 255 255 / 94%);
+}
+
+body.body--dark {
+  color-scheme: dark;
+  --swos-page: #07111f;
+  --swos-surface: #101c2c;
+  --swos-surface-soft: #132235;
+  --swos-border: #2a3b50;
+  --swos-text-muted: #9fb0c3;
+  --swos-map-card: rgb(16 28 44 / 94%);
+  background: var(--swos-page);
+}
+
+body.body--dark .text-grey-7 {
+  color: var(--swos-text-muted) !important;
+}
+
+body.body--dark .maplibregl-popup-content {
+  color: #e8eef6;
+  background: #132235;
+}
+
+body.body--dark .maplibregl-popup-tip {
+  border-top-color: #132235;
+  border-bottom-color: #132235;
+}
+
+body.body--dark .maplibregl-ctrl-group,
+body.body--dark .maplibregl-ctrl-attrib {
+  color: #dbe7f3;
+  background: rgb(16 28 44 / 92%);
+}
+
+body.body--dark .maplibregl-ctrl-group button + button {
+  border-top-color: var(--swos-border);
+}
+
+body.body--dark .maplibregl-ctrl-icon {
+  filter: invert(1) brightness(1.5);
+}
+
+body.body--dark .maplibregl-ctrl-attrib a {
+  color: #9ecbff;
+}
+
+.precipitation-duration-toggle {
+  overflow: hidden;
+  border: 1px solid var(--swos-border);
+  border-radius: 8px;
+  background: var(--swos-surface);
+}
+
+.precipitation-duration-toggle .q-btn {
+  min-width: 54px;
+}
+
+body.body--dark .precipitation-duration-toggle {
+  background: var(--swos-surface);
+}
+
+body.body--dark .precipitation-duration-toggle .q-btn:not(.bg-primary) {
+  color: #d8e6f5;
+  background: var(--swos-surface);
+}
+
+body.body--dark .precipitation-duration-toggle .q-btn:not(:last-child) {
+  border-right: 1px solid var(--swos-border);
+}
+
+body.body--dark .precipitation-duration-toggle .bg-primary {
+  color: #fff !important;
+}
+
+.fullscreen-map-page {
+  height: 100dvh;
+  min-height: 0 !important;
+  overflow: hidden;
+}
+
+.fullscreen-map-page > :not(.q-inner-loading) {
+  min-height: 0;
+}
+
+.dashboard-title-toolbar {
+  min-height: 68px;
+  flex: 0 0 auto;
+  padding-right: 72px;
+  padding-left: 76px;
+  color: inherit;
+  border-bottom: 1px solid var(--swos-border);
+  background: linear-gradient(
+    120deg,
+    var(--swos-surface),
+    var(--swos-surface-soft)
+  );
+}
+
+.fullscreen-map-page > .dashboard-title-toolbar {
+  min-height: 68px;
+}
+
+@media (max-width: 600px) {
+  .fullscreen-map-page > .dashboard-title-toolbar,
+  .dashboard-title-toolbar {
+    min-height: 112px;
+    padding: 58px 68px 8px 12px;
+  }
+}

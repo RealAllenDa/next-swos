@@ -1,4 +1,4 @@
-import {defineStore} from 'pinia';
+import { defineStore } from 'pinia';
 
 export const useGenericStore = defineStore('generic', {
   state: () => ({
@@ -9,15 +9,21 @@ export const useGenericStore = defineStore('generic', {
     screenshot: false,
 
     supportDebugging: false,
-    debuggingEnabled: false
+    debuggingEnabled: false,
   }),
   actions: {
-    initPageSpec(toolbarSupported: boolean, screenshotSupported: boolean, debuggingSupported: boolean) {
-      this.supportToolbar = toolbarSupported
-      this.supportDebugging = debuggingSupported
-      this.supportScreenshot = screenshotSupported
+    initPageSpec(
+      toolbarSupported: boolean,
+      screenshotSupported: boolean,
+      debuggingSupported: boolean
+    ) {
+      this.supportToolbar = toolbarSupported;
+      this.supportDebugging = debuggingSupported;
+      this.supportScreenshot = screenshotSupported;
 
-      this.showToolbar = this.supportToolbar
-    }
-  }
-})
+      this.showToolbar = this.supportToolbar;
+      this.screenshot = false;
+      this.debuggingEnabled = false;
+    },
+  },
+});
