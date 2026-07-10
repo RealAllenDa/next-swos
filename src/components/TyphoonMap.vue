@@ -36,6 +36,7 @@ import { useTyphoonStore } from 'stores/typhoon';
 import MLMapControl from 'components/MLMapControl.vue';
 import TyphoonDetail from 'components/TyphoonDetail.vue';
 import { applyBaseMapTheme, createBaseMapStyle } from 'src/maps/base-style';
+import { addUserLocationControl } from 'src/maps/user-location-control';
 
 interface TyphoonMapData {
   nowcastPoints: FeatureCollection<Point>;
@@ -452,6 +453,7 @@ export default defineComponent({
         })
       );
       map.value.addControl(new NavigationControl(), 'top-left');
+      addUserLocationControl(map.value, 'top-left');
       map.value.addControl(new FullscreenControl(), 'top-left');
       map.value.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left');
       map.value.once('load', () => {

@@ -1,6 +1,9 @@
 <template>
   <q-page class="hazard-page column no-wrap">
-    <q-toolbar class="hazard-toolbar">
+    <q-toolbar
+      :class="{ 'hazard-toolbar--compact': !showHeader }"
+      class="hazard-toolbar"
+    >
       <div>
         <div class="text-h6">{{ config.title }}</div>
         <div class="text-caption text-grey-7">{{ config.subtitle }}</div>
@@ -27,6 +30,7 @@
           :area-geo-json="areaGeoJson"
           :river-geo-json="riverGeoJson"
           :designated-only="designatedOnly"
+          :intensity-style="intensityStyle"
           @select-feature="selectFeature"
         />
       </div>
@@ -48,6 +52,11 @@
             v-if="config.mode === 'flood-rivers'"
             v-model="designatedOnly"
             label="仅显示指定河流"
+          />
+          <q-toggle
+            v-if="supportsIntensityStyle"
+            v-model="intensityStyle"
+            label="强度场样式"
           />
           <q-toggle v-model="showNormal" label="显示正常级别" />
         </q-card-section>
@@ -118,6 +127,7 @@ export default defineComponent({
     config: { type: Object as PropType<HazardConfig>, required: true },
   },
   setup(props) {
+    const genericStore = useGenericStore();
     const endpoint = computed(() => props.config.endpoint);
     const { data, loading, refresh } =
       useProductionPollingFetch<HazardApiState>(endpoint);
@@ -133,10 +143,15 @@ export default defineComponent({
     const showNormal = ref(false);
     const designatedOnly = ref(true);
     const rainGrouping = ref<'area' | 'station'>('area');
+    const intensityStyle = ref(false);
     const selectedStation = ref('');
     const historyOpen = ref(false);
+    const showHeader = computed(() => genericStore.showHeader);
 
     const isRain = computed(() => props.config.mode.startsWith('rain-'));
+    const supportsIntensityStyle = computed(
+      () => isRain.value || props.config.mode === 'wind'
+    );
     const messageTime = computed(() => {
       if (!data.value) return '';
       if ('message_time' in data.value) return data.value.message_time ?? '';
@@ -310,7 +325,7 @@ export default defineComponent({
         openStation(String(properties.id));
     }
 
-    onMounted(() => useGenericStore().initPageSpec(false, false, false));
+    onMounted(() => genericStore.initPageSpec(false, true, false));
 
     return {
       data,
@@ -321,13 +336,16 @@ export default defineComponent({
       showNormal,
       designatedOnly,
       rainGrouping,
+      intensityStyle,
       isRain,
+      supportsIntensityStyle,
       messageTime,
       visibleGroups,
       levelLabel,
       levelColor,
       selectedStation,
       historyOpen,
+      showHeader,
       openStation,
       selectFeature,
     };
@@ -343,10 +361,20 @@ export default defineComponent({
 
 .hazard-toolbar {
   min-height: 68px;
-  padding-right: 160px;
+  padding-right: 224px;
   padding-left: 76px;
   color: inherit;
   background: var(--swos-surface-soft);
+}
+
+.hazard-toolbar--compact {
+  min-height: 64px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.hazard-toolbar--compact > * {
+  display: none;
 }
 
 .hazard-content {
@@ -372,7 +400,13 @@ export default defineComponent({
 @media (max-width: 700px) {
   .hazard-toolbar {
     min-height: 112px;
-    padding: 58px 12px 8px;
+    padding: 66px 12px 8px;
+  }
+
+  .hazard-toolbar--compact {
+    min-height: 64px;
+    padding-top: 0;
+    padding-bottom: 0;
   }
 
   .hazard-content {

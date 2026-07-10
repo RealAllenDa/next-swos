@@ -80,14 +80,6 @@
         </template>
       </q-list>
       <q-separator />
-      <!--      <q-card-section class="q-pa-sm text-caption text-grey-7">-->
-      <!--        雷达数据：<a-->
-      <!--          href="https://www.rainviewer.com/"-->
-      <!--          target="_blank"-->
-      <!--          rel="noopener"-->
-      <!--          >RainViewer</a-->
-      <!--        >-->
-      <!--      </q-card-section>-->
     </q-card>
   </div>
 </template>
@@ -119,19 +111,36 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import type { Feature, FeatureCollection, LineString, Point } from 'geojson';
 import { useQuasar } from 'quasar';
 import { applyBaseMapTheme, createBaseMapStyle } from 'src/maps/base-style';
+import { addUserLocationControl } from 'src/maps/user-location-control';
 import {
   emptyFeatureCollection,
+  floodLevelLabel,
   floodStationLevel,
+  hazardLevelColor,
   maximumRiverLevel,
   pointFeature,
+  rainMeasurementColor,
   validCoordinate,
 } from 'src/composables/hazard-utils';
 
-const props = defineProps<{ data: DashboardData }>();
+const props = withDefaults(
+  defineProps<{ data: DashboardData; layerPanelOpen?: boolean }>(),
+  { layerPanelOpen: undefined }
+);
+const emit = defineEmits<{
+  (event: 'update:layerPanelOpen', value: boolean): void;
+}>();
 const $q = useQuasar();
 const mapContainer = ref<HTMLElement>();
 const map = shallowRef<Map>();
-const layerPanelOpen = ref($q.screen.gt.xs);
+const internalLayerPanelOpen = ref($q.screen.gt.xs);
+const layerPanelOpen = computed({
+  get: () => props.layerPanelOpen ?? internalLayerPanelOpen.value,
+  set: (value: boolean) => {
+    internalLayerPanelOpen.value = value;
+    emit('update:layerPanelOpen', value);
+  },
+});
 const hoverPopup = new Popup({
   closeButton: false,
   closeOnClick: false,
@@ -144,8 +153,8 @@ const visibleLayers = reactive<Record<DashboardLayerId, boolean>>({
   radar: true,
   weatherWarnings: true,
   rain1h: true,
-  rain24h: false,
-  wind: false,
+  rain24h: true,
+  wind: true,
   inundation: true,
   rivers: true,
   stations: true,
@@ -207,7 +216,8 @@ function areaCollection(): FeatureCollection {
 
 function rainCollection(
   state: RainState | null,
-  usePeriod = false
+  usePeriod = false,
+  duration: '1h' | '24h' = '1h'
 ): FeatureCollection<Point> {
   const collection = emptyFeatureCollection<Point>();
   (state?.rain ?? []).forEach((item) => {
@@ -219,6 +229,9 @@ function rainCollection(
         name: item.name,
         area: item.area,
         detail: `${item.value} mm`,
+        value: Number(item.value),
+        label: Number(item.value).toFixed(1),
+        color: rainMeasurementColor(Number(item.value), duration),
         level,
       })
     );
@@ -243,6 +256,9 @@ function windCollections(): {
             name: item.name,
             area,
             detail: `${item.speed} m/s · ${item.direction} · ${item.wind_level}级风`,
+            speed: item.speed,
+            degrees: item.degrees,
+            label: item.speed.toFixed(1),
             level: item.level,
           })
         );
@@ -284,6 +300,7 @@ function inundationCollection(): FeatureCollection<Point> {
             name: item.name,
             area,
             detail: `${item.water_level} cm`,
+            label: `${Number(item.water_level).toFixed(0)}cm`,
             level: item.level,
           })
         );
@@ -299,7 +316,10 @@ function riverCollection(): FeatureCollection {
     feature.properties ??= {};
     const name = String(feature.properties.name ?? '');
     const riverState = props.data.flood?.flood?.[name];
-    feature.properties.level = riverState ? maximumRiverLevel(riverState) : 0;
+    const level = riverState ? maximumRiverLevel(riverState) : 0;
+    feature.properties.level = level;
+    feature.properties.levelLabel = floodLevelLabel(level);
+    feature.properties.levelColor = hazardLevelColor(level);
   });
   return collection;
 }
@@ -316,7 +336,10 @@ function stationCollection(): FeatureCollection<Point> {
         name,
         area: station.original_river,
         detail: `${station.current_level} m`,
+        label: `${Number(station.current_level).toFixed(2)}m`,
         level,
+        levelLabel: floodLevelLabel(level),
+        levelColor: hazardLevelColor(level),
       })
     );
   });
@@ -353,6 +376,7 @@ function typhoonCollections(): {
         category: '台风',
         name: `${detail.name} (${id})`,
         detail: `${current.strong} · ${current.time}`,
+        label: detail.name || id,
         color: strengthColor(current.strong),
         current: true,
       })
@@ -412,6 +436,224 @@ function forecastColor(origin: string): string {
   );
 }
 
+function roundedRect(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number
+) {
+  context.beginPath();
+  context.moveTo(x + radius, y);
+  context.lineTo(x + width - radius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + radius);
+  context.lineTo(x + width, y + height - radius);
+  context.quadraticCurveTo(
+    x + width,
+    y + height,
+    x + width - radius,
+    y + height
+  );
+  context.lineTo(x + radius, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - radius);
+  context.lineTo(x, y + radius);
+  context.quadraticCurveTo(x, y, x + radius, y);
+  context.closePath();
+}
+
+function addDashboardIcon(
+  currentMap: Map,
+  id: string,
+  draw: (context: CanvasRenderingContext2D, size: number) => void
+) {
+  if (currentMap.hasImage(id)) return;
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext('2d');
+  if (!context) return;
+  context.clearRect(0, 0, size, size);
+  context.shadowColor = 'rgb(15 23 42 / 35%)';
+  context.shadowBlur = 6;
+  context.shadowOffsetY = 3;
+  draw(context, size);
+  currentMap.addImage(id, context.getImageData(0, 0, size, size), {
+    pixelRatio: 2,
+  });
+}
+
+function drawRainDrop(
+  context: CanvasRenderingContext2D,
+  size: number,
+  fill: string,
+  accent: string
+) {
+  context.fillStyle = fill;
+  context.strokeStyle = '#ffffff';
+  context.lineWidth = 4;
+  context.beginPath();
+  context.moveTo(size * 0.5, size * 0.1);
+  context.bezierCurveTo(
+    size * 0.78,
+    size * 0.38,
+    size * 0.86,
+    size * 0.58,
+    size * 0.68,
+    size * 0.78
+  );
+  context.bezierCurveTo(
+    size * 0.58,
+    size * 0.9,
+    size * 0.38,
+    size * 0.9,
+    size * 0.28,
+    size * 0.78
+  );
+  context.bezierCurveTo(
+    size * 0.1,
+    size * 0.58,
+    size * 0.22,
+    size * 0.38,
+    size * 0.5,
+    size * 0.1
+  );
+  context.closePath();
+  context.fill();
+  context.stroke();
+  context.shadowBlur = 0;
+  context.fillStyle = accent;
+  context.beginPath();
+  context.arc(size * 0.58, size * 0.58, size * 0.12, 0, Math.PI * 2);
+  context.fill();
+}
+
+function registerDashboardIcons(currentMap: Map) {
+  addDashboardIcon(currentMap, 'dashboard-icon-rain-1h', (context, size) => {
+    drawRainDrop(context, size, '#2563eb', '#bae6fd');
+  });
+  addDashboardIcon(currentMap, 'dashboard-icon-rain-24h', (context, size) => {
+    drawRainDrop(context, size, '#7c3aed', '#facc15');
+    context.shadowBlur = 0;
+    context.fillStyle = '#ffffff';
+    context.font = 'bold 16px Roboto, sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText('24', size * 0.5, size * 0.62);
+  });
+  addDashboardIcon(currentMap, 'dashboard-icon-wind', (context, size) => {
+    context.fillStyle = '#0d9488';
+    context.strokeStyle = '#ffffff';
+    context.lineWidth = 4;
+    context.beginPath();
+    context.moveTo(size * 0.5, size * 0.08);
+    context.lineTo(size * 0.78, size * 0.82);
+    context.lineTo(size * 0.5, size * 0.66);
+    context.lineTo(size * 0.22, size * 0.82);
+    context.closePath();
+    context.fill();
+    context.stroke();
+    context.shadowBlur = 0;
+    context.strokeStyle = '#99f6e4';
+    context.lineWidth = 4;
+    context.beginPath();
+    context.moveTo(size * 0.5, size * 0.2);
+    context.lineTo(size * 0.5, size * 0.62);
+    context.stroke();
+  });
+  addDashboardIcon(currentMap, 'dashboard-icon-inundation', (context, size) => {
+    context.fillStyle = '#0284c7';
+    context.strokeStyle = '#ffffff';
+    context.lineWidth = 4;
+    roundedRect(context, size * 0.15, size * 0.18, size * 0.7, size * 0.62, 16);
+    context.fill();
+    context.stroke();
+    context.shadowBlur = 0;
+    context.strokeStyle = '#bae6fd';
+    context.lineWidth = 5;
+    [0.4, 0.57].forEach((y) => {
+      context.beginPath();
+      context.moveTo(size * 0.26, size * y);
+      context.bezierCurveTo(
+        size * 0.38,
+        size * (y - 0.08),
+        size * 0.48,
+        size * (y + 0.08),
+        size * 0.6,
+        size * y
+      );
+      context.bezierCurveTo(
+        size * 0.68,
+        size * (y - 0.04),
+        size * 0.72,
+        size * (y - 0.02),
+        size * 0.78,
+        size * y
+      );
+      context.stroke();
+    });
+  });
+  addDashboardIcon(currentMap, 'dashboard-icon-station', (context, size) => {
+    context.fillStyle = '#7c3aed';
+    context.strokeStyle = '#ffffff';
+    context.lineWidth = 4;
+    context.beginPath();
+    context.moveTo(size * 0.5, size * 0.1);
+    context.lineTo(size * 0.82, size * 0.32);
+    context.lineTo(size * 0.72, size * 0.78);
+    context.lineTo(size * 0.28, size * 0.78);
+    context.lineTo(size * 0.18, size * 0.32);
+    context.closePath();
+    context.fill();
+    context.stroke();
+    context.shadowBlur = 0;
+    context.strokeStyle = '#ddd6fe';
+    context.lineWidth = 4;
+    context.beginPath();
+    context.arc(size * 0.5, size * 0.5, size * 0.18, Math.PI, Math.PI * 2);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(size * 0.5, size * 0.5);
+    context.lineTo(size * 0.64, size * 0.42);
+    context.stroke();
+  });
+  addDashboardIcon(currentMap, 'dashboard-icon-typhoon', (context, size) => {
+    context.fillStyle = '#dc2626';
+    context.strokeStyle = '#ffffff';
+    context.lineWidth = 4;
+    context.beginPath();
+    context.arc(size * 0.5, size * 0.5, size * 0.34, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
+    context.shadowBlur = 0;
+    context.strokeStyle = '#fecaca';
+    context.lineWidth = 5;
+    context.beginPath();
+    context.arc(
+      size * 0.5,
+      size * 0.5,
+      size * 0.2,
+      Math.PI * 0.25,
+      Math.PI * 1.45
+    );
+    context.stroke();
+    context.beginPath();
+    context.arc(
+      size * 0.5,
+      size * 0.5,
+      size * 0.2,
+      Math.PI * 1.25,
+      Math.PI * 2.45
+    );
+    context.stroke();
+    context.fillStyle = '#ffffff';
+    context.beginPath();
+    context.arc(size * 0.5, size * 0.5, size * 0.07, 0, Math.PI * 2);
+    context.fill();
+  });
+}
+
 const typhoonCoordinates = computed(() =>
   Object.values(props.data.typhoons)
     .flatMap((detail) =>
@@ -426,7 +668,7 @@ const typhoonCoordinates = computed(() =>
     )
 );
 
-const latestRadar = computed(() => props.data.radar?.radar.past.at(-1) ?? null);
+const latestRadar = computed(() => props.data.radar);
 const layerOptions = computed(() => {
   const weatherCount = Object.values(
     props.data.weatherWarnings?.districts ?? {}
@@ -583,7 +825,10 @@ function refreshGeoJsonSources() {
   const typhoons = typhoonCollections();
   setSourceData('dashboard-areas', areaCollection());
   setSourceData('dashboard-rain-1h', rainCollection(props.data.rain1h));
-  setSourceData('dashboard-rain-24h', rainCollection(props.data.rain24h));
+  setSourceData(
+    'dashboard-rain-24h',
+    rainCollection(props.data.rain24h, false, '24h')
+  );
   setSourceData('dashboard-wind-points', wind.points);
   setSourceData('dashboard-wind-lines', wind.lines);
   setSourceData('dashboard-inundation', inundationCollection());
@@ -595,29 +840,36 @@ function refreshGeoJsonSources() {
 
 function refreshRadar() {
   const currentMap = map.value;
-  if (!currentMap?.isStyleLoaded()) return;
+  if (!currentMap) return;
+  if (
+    !currentMap.isStyleLoaded() ||
+    !currentMap.getLayer('dashboard-warning-fill')
+  ) {
+    currentMap.once('idle', refreshRadar);
+    return;
+  }
   if (currentMap.getLayer('dashboard-radar'))
     currentMap.removeLayer('dashboard-radar');
   if (currentMap.getSource('dashboard-radar'))
     currentMap.removeSource('dashboard-radar');
-  const frame = latestRadar.value;
-  const radar = props.data.radar;
-  if (!frame || !radar) return;
+  const radar = latestRadar.value;
+  if (!radar?.dataUrl) return;
   currentMap.addSource('dashboard-radar', {
-    type: 'raster',
-    tiles: [`${radar.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`],
-    tileSize: 256,
-    maxzoom: 7,
-    attribution:
-      'Weather data by <a href="https://www.rainviewer.com/">RainViewer</a>',
+    type: 'geojson',
+    tolerance: 0,
+    data: radar.dataUrl,
   });
   currentMap.addLayer(
     {
       id: 'dashboard-radar',
-      type: 'raster',
+      type: 'fill',
       source: 'dashboard-radar',
       layout: { visibility: visibleLayers.radar ? 'visible' : 'none' },
-      paint: { 'raster-opacity': 0.58, 'raster-fade-duration': 300 },
+      paint: {
+        'fill-color': ['to-color', ['get', 'c']],
+        'fill-opacity': 0.46,
+        'fill-outline-color': 'rgba(0,0,0,0)',
+      },
     },
     'dashboard-warning-fill'
   );
@@ -628,10 +880,11 @@ function addSourcesAndLayers() {
   if (!currentMap) return;
   const wind = windCollections();
   const typhoons = typhoonCollections();
+  registerDashboardIcons(currentMap);
   const sources: Record<string, FeatureCollection> = {
     'dashboard-areas': areaCollection(),
     'dashboard-rain-1h': rainCollection(props.data.rain1h),
-    'dashboard-rain-24h': rainCollection(props.data.rain24h),
+    'dashboard-rain-24h': rainCollection(props.data.rain24h, false, '24h'),
     'dashboard-wind-points': wind.points,
     'dashboard-wind-lines': wind.lines,
     'dashboard-inundation': inundationCollection(),
@@ -733,45 +986,59 @@ function addSourcesAndLayers() {
     id: 'dashboard-wind-lines',
     type: 'line',
     source: 'dashboard-wind-lines',
-    layout: { visibility: 'none' },
+    layout: { visibility: visibleLayers.wind ? 'visible' : 'none' },
     paint: { 'line-color': levelColor, 'line-width': 2.5 },
   });
 
-  addRainHeatmapLayer(
+  addRainSymbolLayer(
     currentMap,
     'dashboard-rain-24h',
     'dashboard-rain-24h',
-    false
+    'dashboard-icon-rain-24h',
+    visibleLayers.rain24h
   );
-  addRainHeatmapLayer(currentMap, 'dashboard-rain-1h', 'dashboard-rain-1h');
-  addCircleLayer(
+  addRainSymbolLayer(
+    currentMap,
+    'dashboard-rain-1h',
+    'dashboard-rain-1h',
+    'dashboard-icon-rain-1h',
+    visibleLayers.rain1h
+  );
+  addIconSymbolLayer(
     currentMap,
     'dashboard-wind-points',
     'dashboard-wind-points',
-    levelColor,
-    5,
-    false
+    'dashboard-icon-wind',
+    visibleLayers.wind,
+    {
+      rotate: ['get', 'degrees'],
+      sortKey: ['-', 0, ['to-number', ['get', 'speed']]],
+      textColor: levelColor,
+    }
   );
-  addCircleLayer(
+  addIconSymbolLayer(
     currentMap,
     'dashboard-inundation',
     'dashboard-inundation',
-    levelColor,
-    8
+    'dashboard-icon-inundation',
+    visibleLayers.inundation,
+    { textColor: levelColor }
   );
-  addCircleLayer(
+  addIconSymbolLayer(
     currentMap,
     'dashboard-stations',
     'dashboard-stations',
-    levelColor,
-    7
+    'dashboard-icon-station',
+    visibleLayers.stations,
+    { textColor: levelColor }
   );
-  addCircleLayer(
+  addIconSymbolLayer(
     currentMap,
     'dashboard-typhoon-points',
     'dashboard-typhoon-points',
-    ['get', 'color'],
-    10
+    'dashboard-icon-typhoon',
+    visibleLayers.typhoons,
+    { textColor: ['get', 'color'], textSize: 11 }
   );
 
   refreshRadar();
@@ -779,76 +1046,78 @@ function addSourcesAndLayers() {
   registerInteractions(currentMap);
 }
 
-function addRainHeatmapLayer(
+function addRainSymbolLayer(
   currentMap: Map,
   id: string,
   source: string,
+  iconImage: string,
   visible = true
 ) {
   currentMap.addLayer({
     id,
-    type: 'heatmap',
+    type: 'symbol',
     source,
-    layout: { visibility: visible ? 'visible' : 'none' },
+    layout: {
+      visibility: visible ? 'visible' : 'none',
+      'symbol-sort-key': ['-', 0, ['to-number', ['get', 'value']]],
+      'icon-image': iconImage,
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 7, 0.48, 12, 0.72],
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
+      'text-allow-overlap': false,
+      'text-font': ['Roboto Bold'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 7, 13, 12, 22],
+      'text-field': ['get', 'label'],
+      'text-offset': [1.1, 0],
+      'text-anchor': 'left',
+    },
     paint: {
-      'heatmap-weight': [
-        'interpolate',
-        ['linear'],
-        ['get', 'level'],
-        1,
-        0.2,
-        6,
-        1,
-      ],
-      'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 7, 0.8, 12, 2],
-      'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 7, 14, 12, 30],
-      'heatmap-opacity': 0.78,
-      'heatmap-color': [
-        'interpolate',
-        ['linear'],
-        ['heatmap-density'],
-        0,
-        'rgba(56, 189, 248, 0)',
-        0.2,
-        '#38bdf8',
-        0.45,
-        '#2563eb',
-        0.7,
-        '#facc15',
-        1,
-        '#ef4444',
-      ],
+      'text-color': ['get', 'color'],
+      'text-halo-color': '#707070',
+      'text-halo-width': 1,
+      'text-halo-blur': 1,
     },
   });
 }
 
-function addCircleLayer(
+function addIconSymbolLayer(
   currentMap: Map,
   id: string,
   source: string,
-  color: string | ExpressionSpecification,
-  radius: number,
-  visible = true
+  iconImage: string,
+  visible = true,
+  options: {
+    rotate?: number | ExpressionSpecification;
+    sortKey?: number | ExpressionSpecification;
+    textColor?: string | ExpressionSpecification;
+    textSize?: number;
+  } = {}
 ) {
   currentMap.addLayer({
     id,
-    type: 'circle',
+    type: 'symbol',
     source,
-    layout: { visibility: visible ? 'visible' : 'none' },
+    layout: {
+      visibility: visible ? 'visible' : 'none',
+      'symbol-sort-key': options.sortKey ?? ['get', 'level'],
+      'icon-image': iconImage,
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 7, 0.52, 12, 0.82],
+      'icon-rotate': options.rotate ?? 0,
+      'icon-rotation-alignment': 'map',
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
+      'text-field': ['get', 'label'],
+      'text-font': ['Roboto Bold'],
+      'text-size': options.textSize ?? 10,
+      'text-offset': [1.25, 0],
+      'text-anchor': 'left',
+      'text-allow-overlap': false,
+    },
     paint: {
-      'circle-color': color,
-      'circle-radius': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        7,
-        radius * 0.65,
-        12,
-        radius,
-      ],
-      'circle-stroke-color': '#fff',
-      'circle-stroke-width': 1.5,
-      'circle-opacity': 0.92,
+      'text-color': options.textColor ?? '#0f172a',
+      'text-halo-color': '#ffffff',
+      'text-halo-width': 1.2,
+      'text-halo-blur': 0.4,
     },
   });
 }
@@ -949,6 +1218,13 @@ function showCombinedPopup(
       const heading = document.createElement('strong');
       heading.textContent = `${category} · ${name}`;
       wrapper.append(heading);
+      if (properties.levelLabel) {
+        const level = document.createElement('div');
+        level.className = 'dashboard-hover-level';
+        level.textContent = `当前级别：${String(properties.levelLabel)}`;
+        level.style.color = String(properties.levelColor ?? '#64748b');
+        wrapper.append(level);
+      }
       if (detail) {
         const row = document.createElement('div');
         row.textContent = detail;
@@ -961,7 +1237,7 @@ function showCombinedPopup(
 
 function applyLayerVisibility() {
   const currentMap = map.value;
-  if (!currentMap?.isStyleLoaded()) return;
+  if (!currentMap) return;
   Object.entries(layerIds).forEach(([key, ids]) => {
     ids.forEach((id) => {
       if (currentMap.getLayer(id)) {
@@ -1009,6 +1285,7 @@ onMounted(() => {
     })
   );
   map.value.addControl(new NavigationControl(), 'bottom-left');
+  addUserLocationControl(map.value, 'bottom-left');
   map.value.addControl(new FullscreenControl(), 'bottom-left');
   map.value.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-right');
   map.value.once('load', addSourcesAndLayers);
@@ -1079,6 +1356,11 @@ onBeforeUnmount(() => {
   height: 1px;
   margin: 7px 0;
   background: var(--swos-border);
+}
+
+:global(.dashboard-hover-level) {
+  margin-top: 2px;
+  font-weight: 700;
 }
 
 @media (max-width: 650px) {

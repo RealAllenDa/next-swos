@@ -1,10 +1,13 @@
 <template>
   <q-page class="precipitation-page column items-stretch no-wrap">
-    <q-toolbar class="precipitation-toolbar">
+    <q-toolbar
+      :class="{ 'precipitation-toolbar--compact': !showHeader }"
+      class="precipitation-toolbar"
+    >
       <div>
         <div class="text-h6">降雨分析</div>
         <div class="text-caption text-grey-7">
-          Precipitation Analysis &amp; Forecast
+          Precipitation Analysis
         </div>
       </div>
     </q-toolbar>
@@ -24,14 +27,14 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onBeforeUnmount, onMounted } from 'vue';
+import {computed, defineComponent, onBeforeUnmount, onMounted} from 'vue';
 import MapSettings from 'components/PrecipFcstMapSettings.vue';
 import PrecipitationMap from 'components/PrecipFcstMap.vue';
-import { usePrecipitationStore } from 'stores/precipitation';
+import {usePrecipitationStore} from 'stores/precipitation';
 import sdk from 'src/composables/sdk';
-import { useRoute } from 'vue-router';
+import {useRoute} from 'vue-router';
 import PageLoading from 'components/PageLoading.vue';
-import { useGenericStore } from 'stores/generic';
+import {useGenericStore} from 'stores/generic';
 import PrecipFcstMapSettingsMobile from 'components/PrecipFcstMapSettingsMobile.vue';
 
 export default defineComponent({
@@ -55,6 +58,9 @@ export default defineComponent({
     const showToolbar = computed(() => {
       return genericStore.showToolbar;
     });
+    const showHeader = computed(() => {
+      return genericStore.showHeader;
+    });
 
     let controller: AbortController | undefined;
 
@@ -63,8 +69,8 @@ export default defineComponent({
       controller = new AbortController();
       try {
         const options = await sdk.fetchJson<MapSpec>(
-          '/static/generic/analysis_map.json',
-          false,
+          `${sdk.cdnUrl}/static/generic/analysis_map.json`,
+          true,
           controller.signal
         );
         precipitationStore.setSpec(options);
@@ -87,8 +93,8 @@ export default defineComponent({
     ) {
       try {
         const data = await sdk.fetchJson<PrecipitationAnalysisList>(
-          '/precip/analysis/list',
-          false,
+          `${sdk.cdnUrl}/analysis/list`,
+          true,
           signal
         );
         if (mutationType !== 'refresh') {
@@ -137,6 +143,7 @@ export default defineComponent({
 
     return {
       showToolbar,
+      showHeader,
       refreshPrecipitation,
       initialized,
     };
@@ -152,16 +159,32 @@ export default defineComponent({
 
 .precipitation-toolbar {
   min-height: 68px;
-  padding-right: 160px;
+  padding-right: 224px;
   padding-left: 76px;
   color: inherit;
   background: var(--swos-surface-soft);
 }
 
+.precipitation-toolbar--compact {
+  min-height: 64px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.precipitation-toolbar--compact > * {
+  display: none;
+}
+
 @media (max-width: 600px) {
   .precipitation-toolbar {
     min-height: 112px;
-    padding: 58px 12px 8px;
+    padding: 66px 12px 8px;
+  }
+
+  .precipitation-toolbar--compact {
+    min-height: 64px;
+    padding-top: 0;
+    padding-bottom: 0;
   }
 }
 </style>

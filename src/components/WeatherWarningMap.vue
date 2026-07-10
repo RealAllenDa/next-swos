@@ -38,6 +38,7 @@ import MLMapControl from 'components/MLMapControl.vue';
 import WeatherWarningLegend from 'components/WeatherWarningLegend.vue';
 import WeatherWarningDetail from 'components/WeatherWarningDetail.vue';
 import { applyBaseMapTheme, createBaseMapStyle } from 'src/maps/base-style';
+import { addUserLocationControl } from 'src/maps/user-location-control';
 
 export default defineComponent({
   name: 'WeatherWarningMap',
@@ -187,6 +188,7 @@ export default defineComponent({
         })
       );
       map.value.addControl(new NavigationControl(), 'top-left');
+      addUserLocationControl(map.value, 'top-left');
       map.value.addControl(new FullscreenControl(), 'top-left');
       map.value.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left');
       map.value.once('load', () => {

@@ -1,6 +1,9 @@
 <template>
   <q-page class="warning-overview-page">
-    <q-toolbar class="dashboard-title-toolbar">
+    <q-toolbar
+      :class="{ 'dashboard-title-toolbar--compact': !genericStore.showHeader }"
+      class="dashboard-title-toolbar"
+    >
       <div>
         <div class="text-h6">警报预报一览</div>
         <div class="text-caption text-grey-7">Warnings Overview</div>
@@ -185,7 +188,8 @@ function levelColor(level: number): string {
   );
 }
 
-useGenericStore().initPageSpec(false, false, false);
+const genericStore = useGenericStore();
+genericStore.initPageSpec(false, true, false);
 </script>
 
 <style scoped>

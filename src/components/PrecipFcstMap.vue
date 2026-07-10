@@ -23,15 +23,42 @@
     </MapControl>
     <MapControl ref="legendDescription">
       <div
-        v-if="
-          precipitationStore.displayRainMeasurements &&
-          precipitationStore.rainMeasurementsSuccess
-        "
+        v-if="precipitationStore.initialized"
         class="q-pr-sm q-pl-sm q-pt-sm q-pb-sm legend-description column"
       >
-        <div class="legend-description-sub row">
+        <div class="row">
           <span
-            >{{
+          >{{
+              precipitationStore.selectedDuration.slice(0, -1)
+            }}小时降雨量</span
+          >
+          <span class="q-ml-xl">{{
+              precipitationStore.currentTimeFormatted
+            }}</span>
+        </div>
+        <div
+          v-if="precipitationStore.displayTorrentialRain"
+          class="legend-description-sub row"
+        >
+          <span>猛烈降水带</span>
+          <span>{{ torrentialRainStatus }}</span>
+        </div>
+        <div
+          v-if="precipitationStore.displayGpv"
+          class="legend-description-sub row"
+        >
+          <span>网格雨量</span>
+          <span>{{ precipitationStore.currentTimeFormatted }}</span>
+        </div>
+        <div
+          v-if="
+            precipitationStore.displayRainMeasurements &&
+            precipitationStore.rainMeasurementsSuccess
+          "
+          class="legend-description-sub row"
+        >
+          <span
+          >{{
               precipitationStore.selectedDuration.replace('h', '')
             }}小时站点观测</span
           >
@@ -43,41 +70,33 @@
 </template>
 
 <script lang="ts">
-import {
-  computed,
-  defineComponent,
-  markRaw,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  shallowRef,
-  watch,
-} from 'vue';
-import { usePrecipitationStore } from 'stores/precipitation';
+import {computed, defineComponent, markRaw, onBeforeUnmount, onMounted, ref, shallowRef, watch,} from 'vue';
+import {usePrecipitationStore} from 'stores/precipitation';
 import sdk from 'src/composables/sdk';
-import type { FeatureCollection } from '@turf/turf';
+import type {FeatureCollection} from '@turf/turf';
 import * as turf from '@turf/turf';
-import { round } from '@turf/turf';
+import {round} from '@turf/turf';
 import {
   FullscreenControl,
+  type GeoJSONSource,
   Map,
+  type MapLayerMouseEvent,
   NavigationControl,
   Popup,
   ScaleControl,
-  type GeoJSONSource,
-  type MapLayerMouseEvent,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import MapControl from 'components/MLMapControl.vue';
 import PrecipFcstLegend from 'components/PrecipFcstLegend.vue';
-import { useGenericStore } from 'stores/generic';
-import { format } from 'date-fns';
+import {useGenericStore} from 'stores/generic';
+import {format} from 'date-fns';
 import html2canvas from 'html2canvas';
-import { useQuasar } from 'quasar';
-import { applyBaseMapTheme, createBaseMapStyle } from 'src/maps/base-style';
+import {useQuasar} from 'quasar';
+import {applyBaseMapTheme, createBaseMapStyle} from 'src/maps/base-style';
+import {addUserLocationControl} from 'src/maps/user-location-control';
 
 export default defineComponent({
-  components: { MapControl, PrecipFcstLegend },
+  components: {MapControl, PrecipFcstLegend},
   setup() {
     const $q = useQuasar();
     const isDesktopLayout = computed(() => {
@@ -119,9 +138,13 @@ export default defineComponent({
     const legendDescription = ref<typeof MapControl>();
 
     const rainLayerInitialized = ref(false);
+    let rainLayerRefreshToken = 0;
+    let rainLayerLoadedToken = 0;
+    let rainMeasurementsRefreshToken = 0;
     const torrentialRainLayerInitialized = ref(false);
     const rainMeasurementsLayerInitialized = ref(false);
     const gpvLayerInitialized = ref(false);
+    const torrentialRainStatus = ref('无');
 
     function registerFeatureHover(
       layerId: string,
@@ -204,13 +227,16 @@ export default defineComponent({
 
     function refreshTorrentialRain() {
       if (!torrentialRainDisplay.value) {
+        torrentialRainStatus.value = '无';
         if (torrentialRainLayerInitialized.value) {
           map.value?.setLayoutProperty('torrential-rain', 'visibility', 'none');
         }
         return;
       }
-      const { data: torrentialRainGeoJson } = sdk.useFetch<FeatureCollection>(
-        `/parse/rain/tor_zone_3h_5km_${currentData.value?.time}.geojson`
+      torrentialRainStatus.value = '无';
+      const {data: torrentialRainGeoJson} = sdk.useFetch<FeatureCollection>(
+        `${sdk.cdnUrl}/analysis/rain/tor_zone_3h_5km_${currentData.value?.time}.geojson`,
+        true
       );
       watch(
         torrentialRainGeoJson,
@@ -219,6 +245,7 @@ export default defineComponent({
             torrentialRainGeoJson.value === undefined ||
             torrentialRainGeoJson.value === null
           ) {
+            torrentialRainStatus.value = '无';
             sdk.showNotification('negative', 'Failed to fetch torrential rain');
             return;
           }
@@ -246,6 +273,10 @@ export default defineComponent({
               dataCollection.features.push(feature);
             }
           });
+          torrentialRainStatus.value =
+            dataCollection.features.length > 0
+              ? precipitationStore.currentTimeFormatted
+              : '无';
           if (!torrentialRainLayerInitialized.value) {
             map.value?.addSource('torrential-rain', {
               type: 'geojson',
@@ -276,7 +307,7 @@ export default defineComponent({
             )?.setData(dataCollection);
           }
         },
-        { once: true }
+        {once: true}
       );
     }
 
@@ -292,7 +323,7 @@ export default defineComponent({
           type: 'geojson',
           // buffer: 0,
           tolerance: 0,
-          data: `${sdk.apiUrl}/parse/rain/gpv_${precipitationStore.selectedDuration}_5km_${currentData.value?.time}.geojson`,
+          data: `${sdk.cdnUrl}/analysis/rain/gpv_${precipitationStore.selectedDuration}_5km_${currentData.value?.time}.geojson`,
         });
         map.value?.addLayer({
           id: 'gpv',
@@ -315,7 +346,7 @@ export default defineComponent({
       } else {
         map.value?.setLayoutProperty('gpv', 'visibility', 'visible');
         (map.value?.getSource('gpv') as GeoJSONSource | undefined)?.setData(
-          `${sdk.apiUrl}/parse/rain/gpv_${precipitationStore.selectedDuration}_5km_${currentData.value?.time}.geojson`
+          `${sdk.cdnUrl}/analysis/rain/gpv_${precipitationStore.selectedDuration}_5km_${currentData.value?.time}.geojson`
         );
       }
     }
@@ -444,9 +475,12 @@ export default defineComponent({
     }
 
     function refreshRainMeasurements() {
+      rainMeasurementsRefreshToken += 1;
+      const refreshToken = rainMeasurementsRefreshToken;
       if (!rainMeasurementsDisplay.value) {
+        precipitationStore.rainMeasurementsSuccess = false;
+        precipitationStore.rainMeasurementsTime = '';
         if (rainMeasurementsLayerInitialized.value) {
-          precipitationStore.rainMeasurementsSuccess = false;
           setRainMeasurementsVisibility(false);
         }
         return;
@@ -469,13 +503,20 @@ export default defineComponent({
         type: 'FeatureCollection',
         features: [],
       };
-      const { data: rain } = sdk.useFetch<RainMeasurements>(rain_url, true);
+      const {data: rain} = sdk.useFetch<RainMeasurements>(rain_url, true);
       watch(
         rain,
         () => {
-          if (rain.value === undefined || rain.value === null) {
+          if (refreshToken !== rainMeasurementsRefreshToken) {
+            return;
+          }
+          if (rain.value === undefined) {
+            return;
+          }
+          if (rain.value === null) {
             setRainMeasurementsVisibility(false);
             precipitationStore.rainMeasurementsSuccess = false;
+            precipitationStore.rainMeasurementsTime = '';
             return;
           }
           rain.value.rain.forEach((station) => {
@@ -490,6 +531,7 @@ export default defineComponent({
                   coordinates: [station.longitude, station.latitude],
                 },
                 properties: {
+                  name: station.name,
                   value: round(precipitation, 2),
                   color: color,
                 },
@@ -533,7 +575,7 @@ export default defineComponent({
               source: 'rain-measurements',
               minzoom: 8,
               layout: {
-                'symbol-sort-key': ['get', 'value'],
+                'symbol-sort-key': ['-', 0, ['to-number', ['get', 'value']]],
                 'text-allow-overlap': false,
                 'text-font': ['Roboto Bold'],
                 'text-size': 20,
@@ -580,11 +622,12 @@ export default defineComponent({
                 event.features?.[0]?.properties.name ?? '降雨观测站'
               ),
               detail: `${
-                Number(event.features?.[0]?.properties.value ?? 0) / 1000
+                event.features?.[0]?.layer.id === 'rain-measurements-3d'
+                  ? Number(event.features?.[0]?.properties.value ?? 0) / 1000
+                  : Number(event.features?.[0]?.properties.value ?? 0)
               } mm`,
             });
             registerFeatureHover('rain-measurements-3d', measurementContent);
-            registerFeatureHover('rain-measurements-point', measurementContent);
             registerFeatureHover('rain-measurements-label', measurementContent);
             rainMeasurementsLayerInitialized.value = true;
           } else {
@@ -603,7 +646,7 @@ export default defineComponent({
           precipitationStore.rainMeasurementsSuccess = true;
           setRainMeasurementsVisibility();
         },
-        { once: true }
+        {once: true}
       );
     }
 
@@ -615,10 +658,11 @@ export default defineComponent({
       ) {
         resolution = precipitationStore.thumbnailQualityResolution;
       }
-      return `${sdk.apiUrl}/parse/rain/rain_${precipitationStore.selectedDuration}_${resolution}_${currentData.value?.time}.geojson`;
+      return `${sdk.cdnUrl}/analysis/rain/rain_${precipitationStore.selectedDuration}_${resolution}_${currentData.value?.time}.geojson`;
     }
 
     function refreshRainLayer() {
+      rainLayerRefreshToken += 1;
       precipitationStore.mapIsLoading = true;
       if (!rainLayerInitialized.value) {
         map.value?.addSource('rain', {
@@ -704,6 +748,7 @@ export default defineComponent({
       }),
       async () => {
         if (!genericStore.screenshot || !mapContainer.value) return;
+        genericStore.screenshotHandled = true;
         try {
           const pngImage = (
             await html2canvas(mapContainer.value, {
@@ -754,14 +799,28 @@ export default defineComponent({
         );
       }
 
-      map.value.addControl(new FullscreenControl(), 'top-left');
       map.value.addControl(new NavigationControl(), 'top-left');
-      map.value.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left');
+      addUserLocationControl(map.value, 'top-left');
+      map.value.addControl(new FullscreenControl(), 'top-left');
+      map.value.addControl(new ScaleControl({unit: 'metric'}), 'bottom-left');
 
       map.value.on('sourcedata', (e) => {
-        if (e.sourceId === 'rain') {
-          precipitationStore.mapIsLoading = !e.isSourceLoaded;
+        if (e.sourceId !== 'rain') {
+          return;
         }
+        if (
+          !e.isSourceLoaded ||
+          map.value?.isSourceLoaded('rain') !== true
+        ) {
+          precipitationStore.mapIsLoading = true;
+          return;
+        }
+        const refreshToken = rainLayerRefreshToken;
+        if (rainLayerLoadedToken === refreshToken) {
+          return;
+        }
+        rainLayerLoadedToken = refreshToken;
+        precipitationStore.mapIsLoading = false;
       });
       map.value.once('load', () => {
         if (precipitationStore.dataChanged) {
@@ -783,6 +842,7 @@ export default defineComponent({
       showLegend,
       legendRain,
       legendDescription,
+      torrentialRainStatus,
       currentData,
       rainMeasurementsDisplay,
       torrentialRainDisplay,
@@ -827,18 +887,38 @@ export default defineComponent({
   background: var(--swos-map-card);
   border: 2px solid var(--swos-border);
   margin: 10px 10px 0 0;
+  min-width: 260px;
+  gap: 4px;
   font-size: 17px;
   font-weight: 700;
   border-radius: 4px;
 }
 
 .legend-description-sub {
+  gap: 16px;
   font-size: 14px;
   justify-content: space-between;
+}
+
+.legend-description-sub span:last-child {
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 .rain-measurements-popup {
   font-size: 20px !important;
   padding: 5px !important;
+}
+
+@media (max-width: 650px) {
+  .legend-description {
+    min-width: 220px;
+    margin: 8px 8px 0 0;
+    font-size: 14px;
+  }
+
+  .legend-description-sub {
+    font-size: 12px;
+  }
 }
 </style>

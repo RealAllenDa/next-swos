@@ -1,13 +1,16 @@
 <template>
   <q-page class="dashboard-page column no-wrap">
-    <section class="dashboard-header row items-center q-px-lg q-py-md">
+    <section
+      :class="{ 'dashboard-header--compact': !genericStore.showHeader }"
+      class="dashboard-header row items-center q-px-lg q-py-md"
+    >
       <div>
         <div class="text-h4 text-weight-bold">综合态势</div>
         <div class="text-subtitle2 text-grey-7">
-          Shanghai Weather & Warning Observation System
+          Shanghai Weather Warning & Observation System
         </div>
       </div>
-      <q-space />
+      <q-space/>
       <div class="latest-status text-right">
         <div class="text-caption text-grey-7">最近数据时间</div>
         <div class="text-subtitle2 text-weight-medium">{{ latestUpdate }}</div>
@@ -15,15 +18,24 @@
     </section>
 
     <section class="map-section">
-      <ComprehensiveMap :data="dashboardData" />
+      <ComprehensiveMap
+        v-model:layer-panel-open="dashboardLayerPanelOpen"
+        :data="dashboardData"
+      />
       <q-linear-progress
         v-if="initialLoading"
         class="dashboard-progress"
         indeterminate
       />
 
-      <div class="dashboard-top-overlay">
+      <div
+        :class="{
+          'dashboard-top-overlay--panel-open': dashboardLayerPanelOpen,
+        }"
+        class="dashboard-top-overlay"
+      >
         <div
+          v-show="genericStore.showStatusBar"
           :class="`status-bar--${topStatusTone}`"
           class="status-bar map-glass-panel"
         >
@@ -46,12 +58,12 @@
                 :to="status.href"
                 class="status-item"
               >
-                <q-icon :name="status.icon" size="1.1rem" />
+                <q-icon :name="status.icon" size="1.1rem"/>
                 <span class="status-label">{{ status.label }}</span>
                 <span class="status-message">{{ status.message }}</span>
                 <span v-if="status.time" class="status-time">{{
-                  status.time
-                }}</span>
+                    status.time
+                  }}</span>
               </router-link>
             </div>
           </div>
@@ -62,11 +74,11 @@
             class="status-detail"
           >
             <div class="status-detail-title">
-              <q-icon :name="currentDetailStatus.icon" size="1.1rem" />
+              <q-icon :name="currentDetailStatus.icon" size="1.1rem"/>
               <span class="status-label">{{ currentDetailStatus.label }}</span>
               <span class="status-message">{{
-                currentDetailStatus.message
-              }}</span>
+                  currentDetailStatus.message
+                }}</span>
             </div>
             <div class="status-detail-viewport">
               <div
@@ -82,11 +94,11 @@
           </router-link>
         </div>
 
-        <div class="map-insight-dock">
+        <div v-show="genericStore.showInsightDock" class="map-insight-dock">
           <router-link class="map-insight rain-insight" to="/precip/forecast">
             <div class="insight-heading">
-              <span><q-icon name="water_drop" /> 降雨</span>
-              <q-icon name="arrow_forward" />
+              <span><q-icon name="water_drop"/> 降雨</span>
+              <q-icon name="arrow_forward"/>
             </div>
             <div class="rain-comparison">
               <div
@@ -97,7 +109,7 @@
                 <div class="rain-value">
                   <span>{{ rain.label }}</span>
                   <strong
-                    >{{ rain.maximum.toFixed(1) }}<small> mm</small></strong
+                  >{{ rain.maximum.toFixed(1) }}<small> mm</small></strong
                   >
                 </div>
                 <div class="rain-track">
@@ -116,49 +128,122 @@
             to="/wind"
           >
             <div class="metric-icon wind-compass">
-              <q-icon :style="windDirectionStyle" name="navigation" />
+              <q-icon :style="windDirectionStyle" name="navigation"/>
             </div>
             <div>
               <span class="insight-label">风场</span>
               <strong
-                >{{ maximumWind.speed.toFixed(1) }} <small>m/s</small></strong
+              >{{ maximumWind.speed.toFixed(1) }} <small>m/s</small></strong
               >
               <span class="insight-note"
-                >{{ maximumWind.direction }} ·
+              >{{ maximumWind.direction }} ·
                 {{ strongWindCount }} 个强风站点</span
               >
             </div>
           </router-link>
 
           <router-link
+            v-if="activeTyphoonSummaries.length === 0"
             class="map-insight metric-insight water-insight"
             to="/inundation"
           >
             <div class="metric-icon water-level-icon">
-              <q-icon name="water_drop" />
+              <q-icon name="water_drop"/>
             </div>
             <div>
               <span class="insight-label">道路积水</span>
               <strong>{{ inundationSummary.active }} <small>处</small></strong>
               <span class="insight-note"
-                >最高 {{ inundationSummary.maximum.toFixed(1) }} cm</span
+              >最高 {{ inundationSummary.maximum.toFixed(1) }} cm</span
               >
             </div>
           </router-link>
 
-          <div class="map-insight hydro-insight">
-            <span class="insight-label">水情</span>
-            <div class="hydro-metrics">
-              <router-link to="/flood/rivers"
-                ><strong>{{ elevatedRiverCount }}</strong
-                ><span>异常河流</span></router-link
-              >
-              <router-link to="/flood/stations"
-                ><strong>{{ elevatedStationCount }}</strong
-                ><span>异常站点</span></router-link
-              >
+          <div v-else class="map-insight typhoon-insight">
+            <div class="insight-heading typhoon-heading">
+              <router-link class="typhoon-heading-link" to="/typhoon">
+                <span><q-icon name="fa-solid fa-hurricane"/> 活动台风</span>
+                <q-badge
+                  :label="`${activeTyphoonSummaries.length} 个`"
+                  color="negative"
+                  rounded
+                />
+              </router-link>
+              <q-icon name="swipe"/>
             </div>
+            <q-carousel
+              v-model="activeTyphoonSlide"
+              :arrows="activeTyphoonSummaries.length > 1"
+              :autoplay="activeTyphoonSummaries.length > 1 ? 6500 : false"
+              :navigation="activeTyphoonSummaries.length > 1"
+              animated
+              class="typhoon-carousel"
+              control-color="negative"
+              height="92px"
+              infinite
+              swipeable
+            >
+              <q-carousel-slide
+                v-for="typhoon in activeTyphoonSummaries"
+                :key="typhoon.id"
+                :name="typhoon.id"
+                class="typhoon-carousel-slide"
+              >
+                <router-link class="typhoon-card" to="/typhoon">
+                  <div class="typhoon-card-main">
+                    <div class="typhoon-card-icon">
+                      <q-icon name="fa-solid fa-hurricane"/>
+                    </div>
+                    <div class="typhoon-card-content">
+                      <div class="typhoon-card-top">
+                        <strong>{{ typhoon.name }}</strong>
+                        <span>{{ typhoon.strength }}</span>
+                      </div>
+                      <div class="typhoon-location">
+                        <q-icon name="place"/>
+                        <span>{{ typhoon.location }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="typhoon-stat-row">
+                    <span
+                    ><q-icon name="compress"/> {{ typhoon.pressure }}</span
+                    >
+                    <span><q-icon name="air"/> {{ typhoon.speed }}</span>
+                    <span
+                    ><q-icon name="near_me"/> {{ typhoon.movement }}</span
+                    >
+                    <span><q-icon name="schedule"/> {{ typhoon.time }}</span>
+                  </div>
+                </router-link>
+              </q-carousel-slide>
+            </q-carousel>
           </div>
+
+          <router-link class="map-insight warning-insight" to="/generic">
+            <div class="insight-heading warning-heading">
+              <span><q-icon name="warning"/> 预警</span>
+              <q-icon name="arrow_forward"/>
+            </div>
+            <div class="warning-summary-grid">
+              <div
+                :style="{ '--summary-color': weatherWarningSummary.color }"
+                class="warning-summary-item"
+              >
+                <span>天气预警</span>
+                <strong>{{ weatherWarningSummary.count }}</strong>
+                <small>{{ weatherWarningSummary.message }}</small>
+              </div>
+              <div
+                :style="{ '--summary-color': floodWarningSummary.color }"
+                class="warning-summary-item"
+              >
+                <span>防汛预警</span>
+                <strong>{{ floodWarningSummary.count }}</strong>
+                <small>{{ floodWarningSummary.message }}</small>
+              </div>
+            </div>
+          </router-link>
         </div>
       </div>
     </section>
@@ -166,18 +251,13 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import ComprehensiveMap from 'components/ComprehensiveMap.vue';
 import sdk from 'src/composables/sdk';
-import {
-  usePollingFetch,
-  useProductionPollingFetch,
-} from 'src/composables/use-polling-fetch';
-import {
-  floodStationLevel,
-  maximumRiverLevel,
-} from 'src/composables/hazard-utils';
-import { useGenericStore } from 'stores/generic';
+import {usePollingFetch, useProductionPollingFetch,} from 'src/composables/use-polling-fetch';
+import {floodStationLevel, maximumRiverLevel,} from 'src/composables/hazard-utils';
+import {useGenericStore} from 'stores/generic';
+import {useQuasar} from 'quasar';
 
 interface DashboardStatusItem {
   label: string;
@@ -190,9 +270,44 @@ interface DashboardStatusItem {
   time?: string;
 }
 
+interface WeatherWarningSummaryItem extends WeatherWarning {
+  district: string;
+  id: string;
+}
+
+interface ActiveTyphoonSummary {
+  id: string;
+  name: string;
+  location: string;
+  strength: string;
+  pressure: string;
+  speed: string;
+  movement: string;
+  time: string;
+  rawTime: string;
+}
+
+interface OverviewWarningSummary {
+  count: number;
+  message: string;
+  color: string;
+}
+
 type StatusPhase = 'overview' | 'detail';
 
+const $q = useQuasar();
+const genericStore = useGenericStore();
+const dashboardLayerPanelOpen = ref($q.screen.gt.xs);
+
 const warningLevelLabels = ['未知', '蓝色', '黄色', '橙色', '红色'];
+const warningLevelColors = [
+  '#94a3b8',
+  '#41a0f8',
+  '#f3e843',
+  '#f8a931',
+  '#f74e3b',
+];
+const excludedWarningDistricts = new Set(['江苏省', '浙江省']);
 
 function weatherWarningTone(level: number): DashboardStatusTone {
   if (level >= 4) return 'negative';
@@ -201,45 +316,72 @@ function weatherWarningTone(level: number): DashboardStatusTone {
   return 'grey';
 }
 
+function warningLevelColor(level: number): string {
+  return warningLevelColors[level] ?? warningLevelColors[0];
+}
+
 function timestampValue(value?: string) {
   const parsed = Date.parse(value ?? '');
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-useGenericStore().initPageSpec(false, false, false);
-const { data: geography, loading: geographyLoading } =
+function compactTimestamp(value?: string): string {
+  const parsed = Date.parse(value ?? '');
+  if (!Number.isFinite(parsed)) return value || '时间待确认';
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+    .format(parsed)
+    .replace(/\//g, '-');
+}
+
+function formatTyphoonLocation(point: TyphoonPoints): string {
+  const longitude = Number(point.longitude);
+  const latitude = Number(point.latitude);
+  const coordinate =
+    Number.isFinite(longitude) && Number.isFinite(latitude)
+      ? `${latitude.toFixed(1)}°N ${longitude.toFixed(1)}°E`
+      : '位置待确认';
+  return point.position_explanation?.trim() || coordinate;
+}
+
+genericStore.initPageSpec(false, true, false, {
+  dashboardControlsSupported: true,
+});
+const {data: geography, loading: geographyLoading} =
   useProductionPollingFetch<HazardGeoJSON>(
     '/assets/generic/around_shanghai_geojson',
     86_400_000
   );
-const { data: rivers, loading: riversLoading } =
+const {data: rivers, loading: riversLoading} =
   useProductionPollingFetch<HazardGeoJSON>(
     '/assets/flood/river_geojson',
     86_400_000
   );
-const { data: rain1h, loading: rain1hLoading } =
+const {data: rain1h, loading: rain1hLoading} =
   useProductionPollingFetch<RainState>('/warning/rain_state_1h');
-const { data: rain24h, loading: rain24hLoading } =
+const {data: rain24h, loading: rain24hLoading} =
   useProductionPollingFetch<RainState>('/warning/rain_state');
-const { data: wind, loading: windLoading } =
+const {data: wind, loading: windLoading} =
   useProductionPollingFetch<WindState>('/warning/wind_state');
-const { data: inundation, loading: inundationLoading } =
+const {data: inundation, loading: inundationLoading} =
   useProductionPollingFetch<InundationState>('/warning/inundation_state');
-const { data: flood, loading: floodLoading } =
+const {data: flood, loading: floodLoading} =
   useProductionPollingFetch<FloodState>('/warning/flood_state');
-const { data: weatherWarnings, loading: warningLoading } =
+const {data: weatherWarnings, loading: warningLoading} =
   useProductionPollingFetch<WeatherWarningList>('/warning/weather_warning');
-const { data: floodWarning, loading: floodWarningLoading } =
+const {data: floodWarning, loading: floodWarningLoading} =
   useProductionPollingFetch<FloodWarningState>('/warning/flood_warning');
-const { data: typhoonList, loading: typhoonLoading } =
+const {data: typhoonList, loading: typhoonLoading} =
   useProductionPollingFetch<TyphoonList[]>('/warning/typhoon_activity');
-const { data: radar, loading: radarLoading } = usePollingFetch<RainViewerMaps>(
-  'https://api.rainviewer.com/public/weather-maps.json',
-  600_000,
-  true,
-  true
-);
+const {data: precipitationRadarList, loading: radarLoading} =
+  usePollingFetch<PrecipitationAnalysisList>(`${sdk.cdnUrl}/analysis/list`, 600_000, true, true);
 const typhoons = ref<Record<string, TyphoonDetail>>({});
+const activeTyphoonSlide = ref('');
 let typhoonController: AbortController | undefined;
 let typhoonRequestVersion = 0;
 
@@ -283,6 +425,21 @@ watch(typhoonList, async (list) => {
 });
 
 onBeforeUnmount(() => typhoonController?.abort());
+
+const radar = computed<DashboardPrecipitationRadar | null>(() => {
+  const latest = [...(precipitationRadarList.value?.one ?? [])]
+    .sort((a, b) => a.time - b.time)
+    .at(-1);
+  if (!latest) return null;
+  return {
+    time: latest.time,
+    duration: '1h',
+    resolution: '5km',
+    dataUrl: `${sdk.cdnUrl.replace(/\/$/, '')}/analysis/rain/rain_1h_5km_${
+      latest.time
+    }.geojson`,
+  };
+});
 
 const dashboardData = computed<DashboardData>(() => ({
   geography: geography.value,
@@ -329,9 +486,9 @@ const elevatedStationCount = computed(
 
 const rainSummary = computed(() => {
   const values = [
-    { label: '近 1 小时', observations: rain1h.value?.rain ?? [] },
-    { label: '近 24 小时', observations: rain24h.value?.rain ?? [] },
-  ].map(({ label, observations }) => ({
+    {label: '近 1 小时', observations: rain1h.value?.rain ?? []},
+    {label: '近 24 小时', observations: rain24h.value?.rain ?? []},
+  ].map(({label, observations}) => ({
     label,
     active: observations.filter((item) => item.level > 0).length,
     maximum: Math.max(0, ...observations.map((item) => Number(item.value))),
@@ -382,6 +539,123 @@ const inundationSummary = computed(() => {
   };
 });
 
+const activeTyphoonSummaries = computed<ActiveTyphoonSummary[]>(() =>
+  (typhoonList.value ?? [])
+    .filter((typhoon) => typhoon.is_active === 1)
+    .map((typhoon) => {
+      const detail = typhoons.value[typhoon.tfid];
+      const current = detail?.points.at(-1);
+      if (!current) {
+        return {
+          id: typhoon.tfid,
+          name: typhoon.name
+            ? `${typhoon.name} (${typhoon.tfid})`
+            : typhoon.tfid,
+          location: '详情加载中',
+          strength: typhoon.eng_name || '活动中',
+          pressure: '-- hPa',
+          speed: '-- m/s',
+          movement: '路径加载中',
+          time: compactTimestamp(typhoon.start_time),
+          rawTime: typhoon.start_time,
+        };
+      }
+      return {
+        id: typhoon.tfid,
+        name: detail.name ? `${detail.name} (${typhoon.tfid})` : typhoon.tfid,
+        location: formatTyphoonLocation(current),
+        strength: current.strong || '活动中',
+        pressure: `${current.pressure} hPa`,
+        speed: `${current.speed} m/s`,
+        movement: `${current.move_dir || '移动'} ${current.move_speed} km/h`,
+        time: compactTimestamp(current.time),
+        rawTime: current.time,
+      };
+    })
+    .sort((a, b) => timestampValue(b.rawTime) - timestampValue(a.rawTime))
+);
+
+watch(
+  activeTyphoonSummaries,
+  (summaries) => {
+    if (summaries.some((typhoon) => typhoon.id === activeTyphoonSlide.value))
+      return;
+    activeTyphoonSlide.value = summaries[0]?.id ?? '';
+  },
+  {immediate: true}
+);
+
+const effectiveWeatherWarnings = computed<WeatherWarningSummaryItem[]>(() =>
+  Object.entries(weatherWarnings.value?.districts ?? {})
+    .filter(([district]) => !excludedWarningDistricts.has(district))
+    .flatMap(([district, warnings]) =>
+      warnings.map((warning, index) => ({
+        ...warning,
+        district,
+        id: `${district}-${warning.type}-${warning.time}-${index}`,
+      }))
+    )
+    .sort(
+      (a, b) =>
+        b.level - a.level ||
+        timestampValue(b.time) - timestampValue(a.time) ||
+        a.district.localeCompare(b.district, 'zh-CN')
+    )
+);
+
+const weatherWarningSummary = computed<OverviewWarningSummary>(() => {
+  const topWarning = effectiveWeatherWarnings.value[0];
+  if (!topWarning) {
+    return {
+      count: 0,
+      message: '当前无生效天气预警',
+      color: warningLevelColor(0),
+    };
+  }
+  return {
+    count: effectiveWeatherWarnings.value.length,
+    message: `${topWarning.district} ${topWarning.type}${
+      warningLevelLabels[topWarning.level] ?? '未知'
+    }预警`,
+    color: warningLevelColor(topWarning.level),
+  };
+});
+
+const floodWarningItems = computed(() => [
+  {
+    id: 'flood',
+    title: '防汛防台应急响应',
+    level: floodWarning.value?.flood ?? 0,
+  },
+  {
+    id: 'water-level',
+    title: '黄浦江高潮位预警',
+    level: floodWarning.value?.water_level ?? 0,
+  },
+]);
+
+const floodWarningSummary = computed<OverviewWarningSummary>(() => {
+  const active = floodWarningItems.value
+    .filter((item) => item.level > 0)
+    .sort((a, b) => b.level - a.level);
+  const topWarning = active[0] ?? floodWarningItems.value[0];
+  return {
+    count: active.length,
+    message:
+      active.length > 0
+        ? active
+          .map(
+            (item) =>
+              `${item.title}${
+                warningLevelLabels[item.level] ?? `${item.level}级`
+              }`
+          )
+          .join('；')
+        : '当前未发布防汛预警',
+    color: warningLevelColor(topWarning?.level ?? 0),
+  };
+});
+
 const latestUpdate = computed(() => {
   const values = [
     rain1h.value?.message_time,
@@ -393,7 +667,7 @@ const latestUpdate = computed(() => {
     floodWarning.value?.message_time,
   ].filter((value): value is string => Boolean(value));
   if (values.length > 0) return values.sort().at(-1);
-  const radarTime = radar.value?.radar.past.at(-1)?.time;
+  const radarTime = radar.value?.time;
   return radarTime
     ? new Date(radarTime * 1000).toLocaleString('zh-CN')
     : '正在加载';
@@ -475,14 +749,14 @@ const statusItems = computed<DashboardStatusItem[]>(() => {
           : `${nameText} 活动中`,
       detail: latestPoint
         ? `${nameText} 最新强度 ${latestPoint.strong}，中心气压 ${
-            latestPoint.pressure
-          } hPa，近中心最大风速 ${latestPoint.speed} m/s，移向 ${
-            latestPoint.move_dir
-          }，移速 ${latestPoint.move_speed} km/h。${
-            latestPoint.position_explanation ??
-            latestPoint.typhoon_explanation ??
-            ''
-          }`
+          latestPoint.pressure
+        } hPa，近中心最大风速 ${latestPoint.speed} m/s，移向 ${
+          latestPoint.move_dir
+        }，移速 ${latestPoint.move_speed} km/h。${
+          latestPoint.position_explanation ??
+          latestPoint.typhoon_explanation ??
+          ''
+        }`
         : `${nameText} 活动中。`,
       time,
       href: '/typhoon',
@@ -662,7 +936,7 @@ onBeforeUnmount(stopStatusCycle);
 
 .dashboard-header {
   min-height: 92px;
-  padding-right: 56px !important;
+  padding-right: 288px !important;
   padding-left: 76px !important;
   background: linear-gradient(
     120deg,
@@ -670,6 +944,16 @@ onBeforeUnmount(stopStatusCycle);
     var(--swos-surface-soft)
   );
   border-bottom: 1px solid var(--swos-border);
+}
+
+.dashboard-header--compact {
+  min-height: 72px;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.dashboard-header--compact > * {
+  display: none;
 }
 
 .latest-status {
@@ -694,11 +978,16 @@ onBeforeUnmount(stopStatusCycle);
   position: absolute;
   z-index: 3;
   top: 16px;
-  right: 298px;
+  right: 64px;
   left: 16px;
   display: grid;
   gap: 10px;
   pointer-events: none;
+  transition: right 180ms ease;
+}
+
+.dashboard-top-overlay--panel-open {
+  right: 298px;
 }
 
 .status-bar {
@@ -738,7 +1027,6 @@ onBeforeUnmount(stopStatusCycle);
 .status-marquee {
   display: flex;
   width: max-content;
-  min-width: 200%;
   animation: status-marquee var(--status-marquee-duration, 48s) linear infinite;
   will-change: transform;
 }
@@ -753,7 +1041,6 @@ onBeforeUnmount(stopStatusCycle);
 
 .status-marquee-group {
   display: flex;
-  min-width: 50%;
   flex: 0 0 auto;
 }
 
@@ -815,8 +1102,7 @@ onBeforeUnmount(stopStatusCycle);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
-  animation: status-detail-marquee var(--status-detail-duration, 26s) linear
-    infinite;
+  animation: status-detail-marquee var(--status-detail-duration, 26s) linear infinite;
   will-change: transform;
 }
 
@@ -867,10 +1153,6 @@ onBeforeUnmount(stopStatusCycle);
   line-height: 1.2;
   text-decoration: none;
   transition: background 160ms ease;
-}
-
-.status-item:last-child {
-  border-right: 0;
 }
 
 .status-item:hover {
@@ -1045,29 +1327,201 @@ onBeforeUnmount(stopStatusCycle);
   white-space: nowrap;
 }
 
-.hydro-metrics {
+.typhoon-insight {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 5px;
+  min-height: 126px;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 10px 12px 12px;
+  background: linear-gradient(
+    135deg,
+    rgb(220 38 38 / 12%),
+    rgb(14 165 233 / 8%)
+  ),
+  var(--swos-map-card);
 }
 
-.hydro-metrics a {
+.typhoon-heading {
+  margin-bottom: 6px;
+  color: #dc2626;
+}
+
+.typhoon-heading-link {
   display: flex;
-  align-items: baseline;
-  gap: 5px;
+  align-items: center;
+  gap: 7px;
   color: inherit;
   text-decoration: none;
 }
 
-.hydro-metrics strong {
-  color: #6366f1;
-  font-size: 20px;
+.typhoon-carousel {
+  min-width: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
 }
 
-.hydro-metrics span {
+:deep(.typhoon-carousel .q-carousel__slide) {
+  padding: 0;
+}
+
+:deep(.typhoon-carousel .q-carousel__navigation) {
+  bottom: -6px;
+}
+
+:deep(.typhoon-carousel .q-carousel__navigation .q-btn) {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  margin: 0 1px;
+}
+
+:deep(.typhoon-carousel .q-carousel__arrow .q-btn) {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  background: var(--swos-surface);
+  box-shadow: 0 4px 12px rgb(15 23 42 / 18%);
+}
+
+.typhoon-card {
+  display: grid;
+  height: 100%;
+  min-width: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid rgb(220 38 38 / 14%);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--swos-surface) 82%, transparent);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 18%);
+  color: inherit;
+  text-decoration: none;
+}
+
+.typhoon-card-main {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.typhoon-card-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgb(220 38 38 / 22%);
+  border-radius: 50%;
+  color: #dc2626;
+  background: rgb(220 38 38 / 13%);
+  font-size: 18px;
+}
+
+.typhoon-card-content {
+  min-width: 0;
+}
+
+.typhoon-card-top,
+.typhoon-location,
+.typhoon-stat-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.typhoon-card-top {
+  gap: 7px;
+}
+
+.typhoon-card-top strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #991b1b;
+  font-size: 15px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.typhoon-card-top span {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #b45309;
+  background: rgb(245 158 11 / 15%);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.typhoon-location {
+  gap: 3px;
+  margin-top: 3px;
   color: var(--swos-text-muted);
   font-size: 10px;
+}
+
+.typhoon-location span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.typhoon-stat-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 8px;
+  color: var(--swos-text-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.typhoon-stat-row span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.warning-heading {
+  color: #d97706;
+}
+
+.warning-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.warning-summary-item {
+  --summary-color: #94a3b8;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding-left: 8px;
+  border-left: 3px solid var(--summary-color);
+}
+
+.warning-summary-item span {
+  color: var(--swos-text-muted);
+  font-size: 10px;
+}
+
+.warning-summary-item strong {
+  color: var(--summary-color);
+  font-size: 19px;
+  line-height: 1.05;
+}
+
+.warning-summary-item small {
+  overflow: hidden;
+  color: var(--swos-text-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 1200px) {
@@ -1090,6 +1544,11 @@ onBeforeUnmount(stopStatusCycle);
   .rain-insight {
     flex-basis: 312px;
   }
+
+  .warning-insight,
+  .typhoon-insight {
+    flex-basis: 260px;
+  }
 }
 
 @media (max-width: 800px) {
@@ -1108,13 +1567,28 @@ onBeforeUnmount(stopStatusCycle);
   .rain-insight {
     flex-basis: 292px;
   }
+
+  .warning-insight,
+  .typhoon-insight {
+    flex-basis: 252px;
+  }
 }
 
 @media (max-width: 650px) {
+  .dashboard-top-overlay--panel-open {
+    right: 258px;
+  }
+
   .dashboard-header {
     padding-top: 66px !important;
-    padding-right: 16px !important;
+    padding-right: 12px !important;
     padding-left: 16px !important;
+  }
+
+  .dashboard-header--compact {
+    min-height: 64px;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
   }
 
   .latest-status {
@@ -1130,6 +1604,10 @@ onBeforeUnmount(stopStatusCycle);
     top: 10px;
     right: 64px;
     left: 10px;
+  }
+
+  .dashboard-top-overlay.dashboard-top-overlay--panel-open {
+    right: 258px;
   }
 
   .status-marquee {
@@ -1163,6 +1641,11 @@ onBeforeUnmount(stopStatusCycle);
 
   .rain-insight {
     flex-basis: 284px;
+  }
+
+  .warning-insight,
+  .typhoon-insight {
+    flex-basis: 246px;
   }
 }
 </style>

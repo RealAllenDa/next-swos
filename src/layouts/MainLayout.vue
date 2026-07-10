@@ -1,7 +1,11 @@
 <template>
   <q-layout view="lHh Lpr lFf">
     <div
-      :class="{ 'floating-nav--dashboard': route.path === '/' }"
+      :class="{
+        'floating-nav--dashboard': route.path === '/',
+        'floating-nav--dashboard-compact':
+          route.path === '/' && !genericStore.showHeader,
+      }"
       class="floating-nav"
     >
       <q-btn
@@ -25,11 +29,11 @@
               {{ currentTitle }}
             </div>
           </div>
-          <q-separator />
+          <q-separator/>
           <q-list class="floating-menu-list">
             <template v-for="section in navigationSections" :key="section.id">
               <q-item-label class="floating-menu-category" header>
-                <q-icon :name="section.icon" />
+                <q-icon :name="section.icon"/>
                 <span>{{ section.label }}</span>
               </q-item-label>
               <q-item
@@ -42,18 +46,30 @@
                 clickable
               >
                 <q-item-section avatar>
-                  <q-icon :name="item.icon" />
+                  <q-icon :name="item.icon"/>
                 </q-item-section>
                 <q-item-section>{{ item.name }}</q-item-section>
               </q-item>
             </template>
           </q-list>
+          <q-separator class="mobile-menu-disclaimer-separator"/>
+          <div
+            aria-label="无非官方预报数据。数据未经官方质控，仅供参考，不应用于防灾，也不代表官方。"
+            class="mobile-menu-disclaimer"
+          >
+            <q-icon name="info_outline"/>
+            <span>无非官方预报数据。数据未经官方质控，仅供参考，不应用于防灾，也不代表官方。</span>
+          </div>
         </q-menu>
       </q-btn>
     </div>
 
     <div
-      :class="{ 'floating-actions--dashboard': route.path === '/' }"
+      :class="{
+        'floating-actions--dashboard': route.path === '/',
+        'floating-actions--dashboard-compact':
+          route.path === '/' && !genericStore.showHeader,
+      }"
       class="floating-actions"
     >
       <q-btn
@@ -78,6 +94,45 @@
         <q-tooltip>截图</q-tooltip>
       </q-btn>
       <q-btn
+        v-if="genericStore.supportHeader"
+        :aria-label="genericStore.showHeader ? '隐藏标题栏' : '显示标题栏'"
+        :icon="genericStore.showHeader ? 'web_asset_off' : 'web_asset'"
+        class="floating-button"
+        round
+        unelevated
+        @click="toggleHeader"
+      >
+        <q-tooltip>{{
+          genericStore.showHeader ? '隐藏标题栏' : '显示标题栏'
+        }}</q-tooltip>
+      </q-btn>
+      <q-btn
+        v-if="genericStore.supportDashboardControls"
+        :aria-label="genericStore.showStatusBar ? '隐藏状态栏' : '显示状态栏'"
+        :icon="genericStore.showStatusBar ? 'notifications_off' : 'notifications'"
+        class="floating-button"
+        round
+        unelevated
+        @click="toggleStatusBar"
+      >
+        <q-tooltip>{{
+          genericStore.showStatusBar ? '隐藏状态栏' : '显示状态栏'
+        }}</q-tooltip>
+      </q-btn>
+      <q-btn
+        v-if="genericStore.supportDashboardControls"
+        :aria-label="genericStore.showInsightDock ? '隐藏信息卡片' : '显示信息卡片'"
+        :icon="genericStore.showInsightDock ? 'dashboard_customize' : 'dashboard'"
+        class="floating-button"
+        round
+        unelevated
+        @click="toggleInsightDock"
+      >
+        <q-tooltip>{{
+          genericStore.showInsightDock ? '隐藏信息卡片' : '显示信息卡片'
+        }}</q-tooltip>
+      </q-btn>
+      <q-btn
         v-if="genericStore.supportToolbar"
         :aria-label="genericStore.showToolbar ? '隐藏工具栏' : '显示工具栏'"
         :icon="genericStore.showToolbar ? 'visibility' : 'visibility_off'"
@@ -87,49 +142,33 @@
         @click="toggleToolbar"
       >
         <q-tooltip
-          >{{ genericStore.showToolbar ? '隐藏工具栏' : '显示工具栏' }}
+        >{{ genericStore.showToolbar ? '隐藏工具栏' : '显示工具栏' }}
         </q-tooltip>
       </q-btn>
     </div>
 
     <div
-      aria-label="数据未经官方质控，仅供参考，不应用于防灾，也不代表官方。"
+      aria-label="无非官方预报数据。数据未经官方质控，仅供参考，不应用于防灾，也不代表官方。"
       class="floating-disclaimer"
     >
-      <q-icon name="info_outline" />
-      <span>数据未经官方质控，仅供参考，不应用于防灾，也不代表官方。</span>
+      <q-icon name="info_outline"/>
+      <span>无非官方预报数据。数据未经官方质控，仅供参考，不应用于防灾，也不代表官方。</span>
     </div>
-    <q-btn
-      aria-label="查看免责声明"
-      class="floating-button floating-disclaimer-button"
-      icon="info_outline"
-      round
-      unelevated
-    >
-      <q-menu
-        :offset="[0, 10]"
-        anchor="bottom middle"
-        class="floating-disclaimer-menu"
-        self="top middle"
-      >
-        <div class="floating-disclaimer-content">
-          数据未经官方质控，仅供参考，不应用于防灾，也不代表官方。
-        </div>
-      </q-menu>
-    </q-btn>
 
     <q-page-container>
-      <router-view />
+      <router-view/>
     </q-page-container>
   </q-layout>
 </template>
 
 <script lang="ts" setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { useQuasar } from 'quasar';
-import { useRoute } from 'vue-router';
+import {computed, nextTick, onBeforeUnmount, onMounted, ref, watch} from 'vue';
+import {useQuasar} from 'quasar';
+import {useRoute} from 'vue-router';
+import {format} from 'date-fns';
+import html2canvas from 'html2canvas';
 import sdk from 'src/composables/sdk';
-import { useGenericStore } from 'stores/generic';
+import {useGenericStore} from 'stores/generic';
 
 const genericStore = useGenericStore();
 const $q = useQuasar();
@@ -137,7 +176,8 @@ const route = useRoute();
 const isScreenshotting = ref(false);
 const keyBuffer = ref('');
 let screenshotTimeout: ReturnType<typeof setTimeout> | undefined;
-const { data: navigationList } = sdk.useFetch<NavigationList[]>(
+let screenshotFallbackTimeout: ReturnType<typeof setTimeout> | undefined;
+const {data: navigationList} = sdk.useFetch<NavigationList[]>(
   '/assets/page-list.json',
   true
 );
@@ -164,7 +204,7 @@ const navigationSections = computed(() => {
       id: 'overview',
       label: '总览',
       icon: 'dashboard',
-      items: [{ id: 'home', name: '首页', icon: 'home', href: '/' }],
+      items: [{id: 'home', name: '首页', icon: 'home', href: '/'}],
     },
     {
       id: 'rain',
@@ -208,8 +248,19 @@ const navigationSections = computed(() => {
 });
 
 function toggleToolbar() {
-  if (!isScreenshotting.value)
-    genericStore.showToolbar = !genericStore.showToolbar;
+  if (!isScreenshotting.value) genericStore.toggleToolbar();
+}
+
+function toggleHeader() {
+  if (!isScreenshotting.value) genericStore.toggleHeader();
+}
+
+function toggleStatusBar() {
+  if (!isScreenshotting.value) genericStore.toggleStatusBar();
+}
+
+function toggleInsightDock() {
+  if (!isScreenshotting.value) genericStore.toggleInsightDock();
 }
 
 function toggleDarkMode() {
@@ -220,11 +271,37 @@ function toggleDarkMode() {
   );
 }
 
+async function captureCurrentPage() {
+  const target =
+    document.querySelector<HTMLElement>('.q-page') ??
+    document.querySelector<HTMLElement>('.q-page-container');
+  if (!target) throw new Error('No page element found for screenshot');
+
+  const canvas = await html2canvas(target, {
+    backgroundColor: $q.dark.isActive ? '#07111f' : '#fff',
+    useCORS: true,
+  });
+  const anchor = document.createElement('a');
+  const routeLabel =
+    route.path === '/'
+      ? 'Home'
+      : route.path.replace(/^\/+/, '').replace(/[\\/:*?"<>|]+/g, '_') ||
+        'Page';
+  anchor.setAttribute('href', canvas.toDataURL());
+  anchor.setAttribute(
+    'download',
+    `SWoS_${routeLabel}_${format(new Date(), 'yyyy_MM_dd_HH_mm_ss')}.png`
+  );
+  anchor.click();
+  genericStore.screenshotHandled = true;
+}
+
 function downloadPage() {
   if (isScreenshotting.value) return;
   isScreenshotting.value = true;
   const previousState = genericStore.showToolbar;
   genericStore.showToolbar = false;
+  genericStore.screenshotHandled = false;
   genericStore.screenshot = true;
 
   const stop = watch(
@@ -233,10 +310,27 @@ function downloadPage() {
       if (screenshotting) return;
       stop();
       if (screenshotTimeout) clearTimeout(screenshotTimeout);
+      if (screenshotFallbackTimeout) clearTimeout(screenshotFallbackTimeout);
       genericStore.showToolbar = previousState;
       isScreenshotting.value = false;
     }
   );
+  screenshotFallbackTimeout = setTimeout(() => {
+    void (async () => {
+      await nextTick();
+      if (!genericStore.screenshot || genericStore.screenshotHandled) return;
+      try {
+        await captureCurrentPage();
+      } catch (cause) {
+        sdk.showNotification(
+          'negative',
+          `截图失败：${cause instanceof Error ? cause.message : String(cause)}`
+        );
+      } finally {
+        if (genericStore.screenshot) genericStore.screenshot = false;
+      }
+    })();
+  }, 250);
   screenshotTimeout = setTimeout(() => {
     if (!genericStore.screenshot) return;
     genericStore.screenshot = false;
@@ -255,8 +349,8 @@ onMounted(() => {
   const savedTheme = localStorage.getItem('swos-color-scheme');
   $q.dark.set(
     savedTheme === 'dark' ||
-      (savedTheme === null &&
-        window.matchMedia('(prefers-color-scheme: dark)').matches)
+    (savedTheme === null &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches)
   );
   sdk.printLogo();
   document.addEventListener('keydown', hotKeyHandler);
@@ -264,6 +358,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', hotKeyHandler);
   if (screenshotTimeout) clearTimeout(screenshotTimeout);
+  if (screenshotFallbackTimeout) clearTimeout(screenshotFallbackTimeout);
 });
 </script>
 
@@ -284,15 +379,26 @@ onBeforeUnmount(() => {
   top: 25px;
 }
 
+.floating-nav--dashboard-compact {
+  top: 16px;
+}
+
 .floating-actions {
   top: 12px;
   right: 20px;
   display: flex;
+  max-width: calc(100vw - 96px);
+  flex-wrap: wrap;
   gap: 8px;
+  justify-content: flex-end;
 }
 
 .floating-actions--dashboard {
   top: 25px;
+}
+
+.floating-actions--dashboard-compact {
+  top: 16px;
 }
 
 .floating-button {
@@ -328,35 +434,12 @@ onBeforeUnmount(() => {
   transform: translateX(50%);
 }
 
-.floating-disclaimer-button {
-  position: fixed;
-  z-index: 2100;
-  top: 12px;
-  right: 50%;
-  display: none;
-  transform: translateX(50%);
-}
-
-:global(.floating-disclaimer-menu) {
-  width: min(320px, calc(100vw - 24px));
-  border: 1px solid var(--swos-border);
-  border-radius: 8px;
-  background: var(--swos-map-card);
-  box-shadow: 0 18px 50px rgb(15 23 42 / 22%);
-  backdrop-filter: blur(18px);
-}
-
-.floating-disclaimer-content {
-  padding: 12px 14px;
-  color: var(--swos-text-muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
 :global(.floating-menu) {
   width: min(320px, calc(100vw - 24px));
   max-height: min(680px, calc(100vh - 84px));
+  display: flex;
   overflow: hidden;
+  flex-direction: column;
   border: 1px solid var(--swos-border);
   border-radius: 16px;
   background: var(--swos-map-card);
@@ -369,6 +452,7 @@ onBeforeUnmount(() => {
 }
 
 .floating-menu-list {
+  flex: 1 1 auto;
   max-height: min(580px, calc(100vh - 170px));
   overflow-y: auto;
   padding: 8px;
@@ -388,8 +472,34 @@ onBeforeUnmount(() => {
   border-radius: 10px;
 }
 
+.mobile-menu-disclaimer-separator,
+.mobile-menu-disclaimer {
+  display: none;
+}
+
+.mobile-menu-disclaimer {
+  flex: 0 0 auto;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px 14px;
+  color: var(--swos-text-muted);
+  background: color-mix(in srgb, var(--swos-surface-soft) 68%, transparent);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.mobile-menu-disclaimer .q-icon {
+  margin-top: 2px;
+  color: var(--q-primary);
+  font-size: 18px;
+}
+
 @media (max-width: 600px) {
   .floating-nav--dashboard {
+    top: 12px;
+  }
+
+  .floating-nav--dashboard-compact {
     top: 12px;
   }
 
@@ -397,7 +507,13 @@ onBeforeUnmount(() => {
     top: 12px;
   }
 
+  .floating-actions--dashboard-compact {
+    top: 12px;
+  }
+
   .floating-actions {
+    right: 12px;
+    max-width: calc(100vw - 84px);
     gap: 4px;
   }
 }
@@ -407,8 +523,12 @@ onBeforeUnmount(() => {
     display: none;
   }
 
-  .floating-disclaimer-button {
-    display: inline-flex;
+  .mobile-menu-disclaimer-separator {
+    display: block;
+  }
+
+  .mobile-menu-disclaimer {
+    display: flex;
   }
 }
 </style>

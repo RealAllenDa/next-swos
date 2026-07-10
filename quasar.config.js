@@ -1,7 +1,7 @@
-import { defineConfig } from '#q-app/wrappers';
-import { readFileSync } from 'node:fs';
+import {defineConfig} from '#q-app/wrappers';
+import {readFileSync} from 'node:fs';
 
-const { version } = JSON.parse(
+const {version} = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf8')
 );
 
@@ -26,16 +26,22 @@ export default defineConfig(() => ({
       LOGO: JSON.stringify(logo),
       API_URL: JSON.stringify(
         process.env.API_URL ??
-          (process.env.NODE_ENV === 'development'
-            ? 'http://10.0.0.50:8000'
-            : 'https://api.daziannetwork.com')
+        (process.env.NODE_ENV === 'development'
+          ? 'http://10.0.0.50:8000'
+          : 'https://api.daziannetwork.com')
+      ),
+      CDN_URL: JSON.stringify(
+        process.env.CDN_URL ??
+        (process.env.NODE_ENV === 'development'
+          ? 'http://10.0.0.50:8000'
+          : 'https://cdn.swos.daziannetwork.com')
       ),
       DB_API_URL: JSON.stringify(
         process.env.DB_API_URL ?? 'https://db.api.daziannetwork.com'
       ),
     },
   },
-  devServer: { open: true },
+  devServer: {open: true},
   framework: {
     config: {},
     plugins: ['Notify'],

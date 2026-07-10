@@ -2,6 +2,7 @@ declare const ENVIRONMENT: string;
 declare const VERSION: string;
 declare const LOGO: string;
 declare const API_URL: string;
+declare const CDN_URL: string;
 declare const DB_API_URL: string;
 
 declare type Nullable<T> = T | null | undefined;
@@ -24,18 +25,11 @@ declare type DashboardStatusTone =
   | 'negative'
   | 'grey';
 
-declare interface RainViewerFrame {
+declare interface DashboardPrecipitationRadar {
   time: number;
-  path: string;
-}
-
-declare interface RainViewerMaps {
-  generated: number;
-  host: string;
-  radar: {
-    past: RainViewerFrame[];
-    nowcast?: RainViewerFrame[];
-  };
+  duration: '1h';
+  resolution: '5km';
+  dataUrl: string;
 }
 
 declare interface DashboardData {
@@ -49,5 +43,5 @@ declare interface DashboardData {
   weatherWarnings: WeatherWarningList | null;
   floodWarning: FloodWarningState | null;
   typhoons: Record<string, TyphoonDetail>;
-  radar: RainViewerMaps | null;
+  radar: DashboardPrecipitationRadar | null;
 }

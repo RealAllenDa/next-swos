@@ -1,6 +1,9 @@
 <template>
   <q-page class="fullscreen-map-page column items-stretch no-wrap">
-    <q-toolbar class="dashboard-title-toolbar">
+    <q-toolbar
+      :class="{ 'dashboard-title-toolbar--compact': !genericStore.showHeader }"
+      class="dashboard-title-toolbar"
+    >
       <div>
         <div class="text-h6">天气预警</div>
         <div class="text-caption text-grey-7">Weather Warnings</div>
@@ -21,7 +24,8 @@ import { useGenericStore } from 'stores/generic';
 
 const store = useWeatherWarningStore();
 store.$reset();
-useGenericStore().initPageSpec(false, false, false);
+const genericStore = useGenericStore();
+genericStore.initPageSpec(false, true, false);
 const { data, loading } = useProductionPollingFetch<WeatherWarningList>(
   '/warning/weather_warning'
 );

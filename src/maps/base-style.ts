@@ -1,4 +1,11 @@
-import type { Map, RasterLayerSpecification, StyleSpecification } from 'maplibre-gl';
+import type {
+  Map,
+  RasterLayerSpecification,
+  StyleSpecification,
+} from 'maplibre-gl';
+
+const BASE_MAP_LAYER_ID = 'base-map';
+const pendingThemes = new WeakMap<Map, boolean>();
 
 const darkRasterPaint: RasterLayerSpecification['paint'] = {
   'raster-saturation': -0.72,
@@ -17,6 +24,7 @@ const lightRasterPaint: RasterLayerSpecification['paint'] = {
 export function createBaseMapStyle(dark = false): StyleSpecification {
   return {
     version: 8,
+    glyphs: './{fontstack}/{range}.pbf',
     sources: {
       'base-raster': {
         type: 'raster',
@@ -32,7 +40,7 @@ export function createBaseMapStyle(dark = false): StyleSpecification {
     },
     layers: [
       {
-        id: 'base-map',
+        id: BASE_MAP_LAYER_ID,
         type: 'raster',
         source: 'base-raster',
         paint: dark ? darkRasterPaint : lightRasterPaint,
@@ -42,10 +50,21 @@ export function createBaseMapStyle(dark = false): StyleSpecification {
 }
 
 export function applyBaseMapTheme(map: Map | undefined, dark: boolean) {
-  if (!map?.getLayer('base-map')) return;
-  const paint = dark ? darkRasterPaint : lightRasterPaint;
-  Object.entries(paint).forEach(([property, value]) =>
-    map.setPaintProperty('base-map', property, value)
-  );
-  map.getCanvas().style.backgroundColor = dark ? '#07111f' : '#e8eef4';
+  if (!map) return;
+  pendingThemes.set(map, dark);
+
+  const applyTheme = () => {
+    const nextDark = pendingThemes.get(map) ?? dark;
+    if (!map.getLayer(BASE_MAP_LAYER_ID)) {
+      map.once('styledata', applyTheme);
+      return;
+    }
+    const paint = nextDark ? darkRasterPaint : lightRasterPaint;
+    Object.entries(paint).forEach(([property, value]) =>
+      map.setPaintProperty(BASE_MAP_LAYER_ID, property, value)
+    );
+    map.getCanvas().style.backgroundColor = nextDark ? '#07111f' : '#e8eef4';
+  };
+
+  applyTheme();
 }

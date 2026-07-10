@@ -1,8 +1,9 @@
-import { type Ref, ref, unref, watchEffect } from 'vue';
-import { Notify } from 'quasar';
+import {type Ref, ref, unref, watchEffect} from 'vue';
+import {Notify} from 'quasar';
 
 class SDK {
   public apiUrl: string;
+  public cdnUrl: string;
   public dbApiUrl: string;
   public readonly productionApiUrl = 'https://api.daziannetwork.com';
 
@@ -13,6 +14,7 @@ class SDK {
   constructor() {
     this.logColor = ENVIRONMENT === 'production' ? '#43bb88' : 'orange';
     this.apiUrl = API_URL;
+    this.cdnUrl = CDN_URL;
     this.dbApiUrl = DB_API_URL;
     this.useProductionAPI = this.apiUrl === this.productionApiUrl;
   }
@@ -94,7 +96,7 @@ class SDK {
       onCleanup(() => controller.abort());
     });
 
-    return { data, error };
+    return {data, error};
   }
 
   showNotification(type: string, message: string) {

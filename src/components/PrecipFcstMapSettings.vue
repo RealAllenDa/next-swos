@@ -270,6 +270,7 @@
 import {
   computed,
   defineComponent,
+  nextTick,
   onUnmounted,
   ref,
   Ref,
@@ -454,39 +455,66 @@ export default defineComponent({
         precipitationStore.isInPlayback = is;
       },
     });
-    const playbackInterval: Ref<
-      Nullable<ReturnType<typeof setInterval> | number>
-    > = ref();
+    const playbackTimer: Ref<Nullable<number>> = ref();
 
-    function startPlayback() {
-      if (playbackInterval.value && isInPlayback.value) {
-        return;
-      } else {
-        playbackInterval.value = window.setInterval(() => {
-          if (timeLabel.value === latestTime.value) {
-            // Reached the end
-            timeLabel.value = startTime.value;
-          } else {
-            timeForward();
-          }
-        }, selectedSpeed.value);
-        isInPlayback.value = true;
+    function clearPlaybackTimer() {
+      if (playbackTimer.value !== undefined && playbackTimer.value !== null) {
+        window.clearTimeout(playbackTimer.value);
+        playbackTimer.value = undefined;
       }
     }
 
-    function endPlayback() {
-      if (playbackInterval.value) {
-        window.clearInterval(playbackInterval.value);
-        playbackInterval.value = undefined;
+    function scheduleNextPlayback(delayAfterIdle = selectedSpeed.value) {
+      if (!isInPlayback.value) {
+        return;
       }
+      if (precipitationStore.mapIsLoading) {
+        clearPlaybackTimer();
+        playbackTimer.value = window.setTimeout(() => {
+          scheduleNextPlayback(delayAfterIdle);
+        }, 50);
+        return;
+      }
+      clearPlaybackTimer();
+      playbackTimer.value = window.setTimeout(playbackTick, delayAfterIdle);
+    }
+
+    async function playbackTick() {
+      playbackTimer.value = undefined;
+      if (!isInPlayback.value) {
+        return;
+      }
+      if (precipitationStore.mapIsLoading) {
+        scheduleNextPlayback(0);
+        return;
+      }
+      if (timeLabel.value === latestTime.value) {
+        // Reached the end
+        timeLabel.value = startTime.value;
+      } else {
+        timeForward();
+      }
+      await nextTick();
+      scheduleNextPlayback();
+    }
+
+    function startPlayback() {
+      if (playbackTimer.value && isInPlayback.value) {
+        return;
+      }
+      isInPlayback.value = true;
+      scheduleNextPlayback();
+    }
+
+    function endPlayback() {
+      clearPlaybackTimer();
       isInPlayback.value = false;
     }
 
     watch(selectedSpeed, () => {
-      if (isInPlayback.value && playbackInterval.value) {
+      if (isInPlayback.value) {
         // Speed changed in playback!
-        endPlayback();
-        startPlayback();
+        scheduleNextPlayback();
       }
     });
 

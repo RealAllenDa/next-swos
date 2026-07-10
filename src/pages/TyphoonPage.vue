@@ -1,6 +1,9 @@
 <template>
   <q-page class="fullscreen-map-page column items-stretch no-wrap">
-    <q-toolbar class="dashboard-title-toolbar">
+    <q-toolbar
+      :class="{ 'dashboard-title-toolbar--compact': !genericStore.showHeader }"
+      class="dashboard-title-toolbar"
+    >
       <div>
         <div class="text-h6">台风</div>
         <div class="text-caption text-grey-7">Typhoon Tracking</div>
@@ -29,7 +32,8 @@ import { useGenericStore } from 'stores/generic';
 
 const store = useTyphoonStore();
 store.$reset();
-useGenericStore().initPageSpec(false, false, false);
+const genericStore = useGenericStore();
+genericStore.initPageSpec(false, true, false);
 
 const selectedTyphoons = computed(() => store.selectedTyphoonsInList);
 const detailsLoading = ref(false);
