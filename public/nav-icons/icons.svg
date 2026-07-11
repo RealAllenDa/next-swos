@@ -1,25 +1,54 @@
 <svg xmlns="http://www.w3.org/2000/svg">
-  <symbol id="precipitation-forecast" viewBox="0 0 22.19 19.87">
-    <path
-      d="M6,14a1,1,0,0,1,0,2A5,5,0,0,1,6,6a6.51,6.51,0,0,1,12.5,2L19,8a4,4,0,0,1,0,8H18a1,1,0,1,1,0-2h1a2,2,0,0,0,0-4H17V9a5,5,0,0,0-9.94-.82A3.11,3.11,0,0,0,6,8a3,3,0,0,0,0,6m3.27,1.5c.13.2.26.42.38.64a6.32,6.32,0,0,1,1,2.49,1.51,1.51,0,0,1-1.37,1.62,1.51,1.51,0,0,1-1.36-1.62,6.31,6.31,0,0,1,1-2.49l.38-.64m0-2.53-.34.45a19,19,0,0,0-1.16,1.81,7.25,7.25,0,0,0-1.22,3.4A3,3,0,0,0,9.27,21.9,3,3,0,0,0,12,18.66a7.25,7.25,0,0,0-1.22-3.4,20.2,20.2,0,0,0-1.17-1.81"
-      transform="translate(-1 -2.03)"/>
-    <path class="a" d="M14.29,17.88v.81H16v.58H14.29v1.34H13.6V17.32h2.66v.56Z" transform="translate(-1 -2.03)"/>
-    <path class="a" d="M19.42,17.88h-1v2.73H17.7V17.88h-1v-.56h2.76Z" transform="translate(-1 -2.03)"/>
-    <path class="a"
-          d="M20.58,20.61h-.69V17.32h1.64a1.6,1.6,0,0,1,.51.08,1.26,1.26,0,0,1,.39.23,1.06,1.06,0,0,1,.35.82,1,1,0,0,1-.21.65,1.09,1.09,0,0,1-.54.4l.9,1.11H22.1l-.42-.52c-.14-.17-.28-.35-.41-.53h-.69Zm0-1.61h1l.2,0a.59.59,0,0,0,.17-.1.62.62,0,0,0,.14-.18.6.6,0,0,0,.05-.24,1.11,1.11,0,0,0,0-.17.64.64,0,0,0-.08-.19.5.5,0,0,0-.17-.15.6.6,0,0,0-.29-.06h-1Z"
-          transform="translate(-1 -2.03)"/>
+  <defs>
+    <linearGradient id="swos-bg" x1="66" x2="446" y1="46" y2="466" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset=".52" stop-color="#0d3150"/>
+      <stop offset="1" stop-color="#0f766e"/>
+    </linearGradient>
+    <radialGradient id="swos-radar" cx="242" cy="216" r="290" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#67e8f9" stop-opacity=".92"/>
+      <stop offset=".38" stop-color="#38bdf8" stop-opacity=".42"/>
+      <stop offset="1" stop-color="#38bdf8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="swos-sweep" x1="146" x2="426" y1="126" y2="348" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a7f3d0" stop-opacity=".92"/>
+      <stop offset="1" stop-color="#22d3ee" stop-opacity=".12"/>
+    </linearGradient>
+    <filter id="swos-soft-shadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="24" stdDeviation="20" flood-color="#020617" flood-opacity=".36"/>
+    </filter>
+  </defs>
+
+  <symbol id="swos-app-icon" viewBox="0 0 512 512">
+    <rect width="512" height="512" fill="url(#swos-bg)"/>
+    <rect x="18" y="18" width="476" height="476" rx="104" fill="none" stroke="#bae6fd" stroke-opacity=".16" stroke-width="4"/>
+    <path fill="none" stroke="#7dd3fc" stroke-opacity=".12" stroke-width="4" d="M70 156h372M70 256h372M70 356h372M156 70v372M256 70v372M356 70v372"/>
+    <circle cx="256" cy="238" r="174" fill="none" stroke="#bae6fd" stroke-opacity=".17" stroke-width="6"/>
+    <circle cx="256" cy="238" r="113" fill="none" stroke="#bae6fd" stroke-opacity=".24" stroke-width="5"/>
+    <path fill="url(#swos-radar)" d="M256 238 395 126a181 181 0 0 1 42 139z"/>
+    <path fill="url(#swos-sweep)" d="M256 238 412 150a180 180 0 0 1 18 132z"/>
+    <g filter="url(#swos-soft-shadow)" transform="translate(256 256) scale(.86) translate(-256 -256)">
+      <path fill="#f8fdff" d="M161 323c-42 0-76-33-76-74 0-34 24-64 57-72 21-51 70-84 126-84 69 0 127 51 136 118 42 8 73 45 73 88 0 49-40 89-89 89H161z"/>
+      <path fill="#0f172a" fill-opacity=".18" d="M161 323c-42 0-76-33-76-74 0-8 1-15 3-22 11 32 41 55 76 55h226c36 0 68-22 82-53 4 10 5 20 5 31 0 49-40 89-89 89H161z"/>
+      <path fill="none" stroke="#0891b2" stroke-linecap="round" stroke-linejoin="round" stroke-width="28" d="M174 330c31 30 68 45 112 45s78-15 106-45"/>
+      <path fill="none" stroke="#67e8f9" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M185 328c27 22 60 33 100 33 39 0 70-11 95-33"/>
+      <path fill="#0284c7" d="M219 204c14-32 45-52 81-52 43 0 79 31 86 73l-33 4c-5-25-27-43-53-43-23 0-43 13-52 34z"/>
+    </g>
   </symbol>
 
-  <symbol id="precipitation-nowcast" viewBox="0 0 22 20.61">
-    <path
-      d="M8.4,11.45a1,1,0,0,1,.71,1.22L7.81,17.5a1,1,0,0,1-1.22.71A1,1,0,0,1,5.9,17l1.28-4.83a1,1,0,0,1,1.22-.71m9.4,0c.49.1.78.48.65.84l-1.19,3.33a1,1,0,0,1-1.12.48c-.49-.09-.78-.47-.63-.84l1.17-3.32a1,1,0,0,1,1.12-.49m-.53-2.7v-1a5,5,0,0,0-9.94-.81,3.11,3.11,0,0,0-1.06-.19,3,3,0,0,0-1.5,5.6h0a1,1,0,1,1-1,1.73h0a5,5,0,0,1,2.5-9.33,6.51,6.51,0,0,1,12.5,2l.5,0a4,4,0,0,1,4,4,4,4,0,0,1-2,3.46h0a1,1,0,0,1-1.37-.37,1,1,0,0,1,.37-1.37h0a2,2,0,0,0-1-3.73Zm-4.1.43a1,1,0,0,1,.71,1.22l-1.3,4.83a1,1,0,0,1-1.22.71,1,1,0,0,1-.69-1.22L12,9.88a1,1,0,0,1,1.22-.71"
-      transform="translate(-1.27 -0.74)"/>
-    <path class="a" d="M12.84,21.17l-2.2-2v2H10V17.82h.07l2.2,2v-2h.64v3.35Z" transform="translate(-1.27 -0.74)"/>
-    <path class="a"
-          d="M15.21,21.23a1.56,1.56,0,0,1-.68-.14,1.74,1.74,0,0,1-1.06-1.6A1.8,1.8,0,0,1,14,18.26a1.9,1.9,0,0,1,.55-.37,1.72,1.72,0,0,1,.68-.14,1.67,1.67,0,0,1,.67.14,2,2,0,0,1,.56.37,1.82,1.82,0,0,1,.37.56,1.67,1.67,0,0,1,.14.67,1.72,1.72,0,0,1-.14.68,1.9,1.9,0,0,1-.37.55,1.76,1.76,0,0,1-.56.37A1.52,1.52,0,0,1,15.21,21.23Zm0-2.88a.91.91,0,0,0-.43.1,1.07,1.07,0,0,0-.35.25,1.11,1.11,0,0,0-.23.36,1.07,1.07,0,0,0-.09.43,1.12,1.12,0,0,0,.09.44,1.23,1.23,0,0,0,.23.36,1.07,1.07,0,0,0,.35.25,1,1,0,0,0,.43.1,1.08,1.08,0,0,0,.43-.1,1,1,0,0,0,.34-.25,1.26,1.26,0,0,0,.24-.36,1.11,1.11,0,0,0,.08-.44,1.06,1.06,0,0,0-.08-.43A1.13,1.13,0,0,0,16,18.7a1,1,0,0,0-.34-.25A.94.94,0,0,0,15.21,18.35Z"
-          transform="translate(-1.27 -0.74)"/>
-    <path class="a"
-          d="M21.49,17.82l-1.25,3.35h-.06l-.91-2-.92,2h-.06l-1.23-3.35h.68l.66,1.84.85-1.84h0l.85,1.84.67-1.84Z"
-          transform="translate(-1.27 -0.74)"/>
+  <symbol id="precipitation-forecast" viewBox="0 0 64 64">
+    <rect x="5" y="5" width="54" height="54" rx="14" fill="currentColor" opacity=".12"/>
+    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="4.5" opacity=".32" d="M18 21h28M15 32h34M20 43h24"/>
+    <path fill="currentColor" d="M19.5 39.5c-7 0-12.5-5.3-12.5-12 0-5.6 4-10.5 9.3-11.8C20 7.3 28 2 37.2 2c11.4 0 20.8 8.3 22.1 19.4A14 14 0 0 1 55 49H39.6c-1.4 0-2.6-1.2-2.6-2.6s1.2-2.6 2.6-2.6H55a8.8 8.8 0 0 0 .9-17.6l-1.8-.2-.2-1.8A16.8 16.8 0 0 0 22 20.4l-.8 1.7-1.9-.3a7.4 7.4 0 0 0-7.1 7.6c0 4 3.2 7 7.3 7 1.4 0 2.6 1.1 2.6 2.5s-1.2 2.6-2.6 2.6z" transform="scale(.84) translate(2 4)"/>
+    <path fill="currentColor" d="M29 45.2c-3.8 0-6.9-3-6.9-6.8 0-2.8 3.9-8.7 5.7-11.2a1.5 1.5 0 0 1 2.4 0c1.8 2.5 5.7 8.4 5.7 11.2 0 3.8-3.1 6.8-6.9 6.8zm0-12.8c-1.5 2.5-2.7 5-2.7 6 0 1.5 1.2 2.7 2.7 2.7s2.7-1.2 2.7-2.7c0-1-1.2-3.5-2.7-6z"/>
+    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M38 30h10m-5-5v10m-2 11h10"/>
+  </symbol>
+
+  <symbol id="precipitation-nowcast" viewBox="0 0 64 64">
+    <rect x="5" y="5" width="54" height="54" rx="14" fill="currentColor" opacity=".12"/>
+    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="4.5" opacity=".3" d="M17 22h30M15 33h34M20 44h24"/>
+    <path fill="currentColor" d="M20 39.2c-7.1 0-12.8-5.4-12.8-12.2 0-5.7 4-10.6 9.4-11.9C20.4 6.7 28.5 1.3 37.8 1.3c11.5 0 21.1 8.5 22.3 19.6A14.2 14.2 0 0 1 55.7 49h-2.9a2.6 2.6 0 1 1 0-5.2h2.9a9 9 0 0 0 .9-17.9l-1.9-.2-.2-1.9A17 17 0 0 0 22.1 20l-.8 1.8-2-.3A7.6 7.6 0 0 0 12.4 29c0 4 3.3 7.2 7.6 7.2a2.5 2.5 0 1 1 0 5z" transform="scale(.84) translate(2 4)"/>
+    <path fill="currentColor" d="M24.4 51.3a3 3 0 0 1-2.2-3.7l3.2-11.8a3 3 0 0 1 5.9 1.5L28 49.1a3 3 0 0 1-3.6 2.2zm11.3 3a3 3 0 0 1-2.2-3.7l4.5-16.8a3 3 0 1 1 5.8 1.5l-4.5 16.8a3 3 0 0 1-3.6 2.2zm11.9-3a3 3 0 0 1-2.2-3.7l3.2-11.8a3 3 0 0 1 5.9 1.5l-3.2 11.8a3 3 0 0 1-3.7 2.2z"/>
+    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="4" opacity=".52" d="M22 18a17 17 0 0 1 23 0M27 23a10 10 0 0 1 13 0"/>
   </symbol>
 </svg>

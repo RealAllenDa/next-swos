@@ -1,4 +1,4 @@
-import {defineConfig} from '#q-app/wrappers';
+import {defineConfig} from '#q-app';
 import {readFileSync} from 'node:fs';
 
 const {version} = JSON.parse(
@@ -10,53 +10,67 @@ const logo = Buffer.from(
   'base64'
 ).toString();
 
-export default defineConfig(() => ({
-  boot: [],
-  css: ['app.scss'],
-  extras: ['fontawesome-v6', 'roboto-font', 'material-icons'],
-  build: {
-    target: {
-      browser: ['es2022', 'edge120', 'firefox120', 'chrome120', 'safari16'],
-      node: 'node24',
+export default defineConfig((ctx) => {
+  const environment =
+    process.env.NODE_ENV ?? (ctx.dev ? 'development' : 'production');
+  const apiUrl =
+    process.env.API_URL ??
+    (ctx.dev ? 'http://10.0.0.50:8000' : 'https://api.daziannetwork.com');
+  const cdnUrl =
+    process.env.CDN_URL ??
+    (ctx.dev
+      ? 'http://10.0.0.50:8000'
+      : 'https://cdn.swos.daziannetwork.com');
+
+  return {
+    boot: [],
+    css: ['app.scss'],
+    extras: ['fontawesome-v7', 'roboto-font', 'material-icons'],
+    build: {
+      target: {
+        browser: ['es2022', 'edge120', 'firefox120', 'chrome120', 'safari16'],
+        node: 'node24',
+      },
+      vueRouterMode: 'hash',
+      vueOptionsAPI: true,
+      alias: {
+        src: ctx.appPaths.srcDir,
+        app: ctx.appPaths.appDir,
+        components: ctx.appPaths.resolve.src('components'),
+        layouts: ctx.appPaths.resolve.src('layouts'),
+        pages: ctx.appPaths.resolve.src('pages'),
+        assets: ctx.appPaths.resolve.src('assets'),
+        boot: ctx.appPaths.resolve.src('boot'),
+        stores: ctx.appPaths.resolve.src('stores'),
+      },
+      define: {
+        ENVIRONMENT: JSON.stringify(environment),
+        VERSION: JSON.stringify(version),
+        LOGO: JSON.stringify(logo),
+        API_URL: JSON.stringify(apiUrl),
+        CDN_URL: JSON.stringify(cdnUrl),
+        DB_API_URL: JSON.stringify(
+          process.env.DB_API_URL ?? 'https://db.api.daziannetwork.com'
+        ),
+      },
     },
-    vueRouterMode: 'hash',
-    rawDefine: {
-      ENVIRONMENT: JSON.stringify(process.env.NODE_ENV),
-      VERSION: JSON.stringify(version),
-      LOGO: JSON.stringify(logo),
-      API_URL: JSON.stringify(
-        process.env.API_URL ??
-        (process.env.NODE_ENV === 'development'
-          ? 'http://10.0.0.50:8000'
-          : 'https://api.daziannetwork.com')
-      ),
-      CDN_URL: JSON.stringify(
-        process.env.CDN_URL ??
-        (process.env.NODE_ENV === 'development'
-          ? 'http://10.0.0.50:8000'
-          : 'https://cdn.swos.daziannetwork.com')
-      ),
-      DB_API_URL: JSON.stringify(
-        process.env.DB_API_URL ?? 'https://db.api.daziannetwork.com'
-      ),
+    devServer: {open: true},
+    framework: {
+      config: {},
+      plugins: ['Notify'],
     },
-  },
-  devServer: {open: true},
-  framework: {
-    config: {},
-    plugins: ['Notify'],
-  },
-  animations: [],
-  ssr: {
-    pwa: false,
-    prodPort: 3000,
-    middlewares: ['render'],
-  },
-  pwa: {
-    workboxMode: 'GenerateSW',
-    injectPwaMetaTags: true,
-    swFilename: 'sw.js',
-    manifestFilename: 'manifest.json',
-    useCredentialsForManifestTag: false,
-  },
-}));
+    animations: [],
+    ssr: {
+      pwa: false,
+      prodPort: 3000,
+      middlewares: ['render'],
+    },
+    pwa: {
+      workboxMode: 'GenerateSW',
+      injectPWAMetaTags: true,
+      swFilename: 'sw.js',
+      manifestFilename: 'manifest.json',
+      useCredentialsForManifestTag: false,
+    },
+  };
+});

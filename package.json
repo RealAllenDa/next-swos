@@ -15,19 +15,19 @@
     "test": "npm run lint && npm run typecheck"
   },
   "dependencies": {
-    "@quasar/extras": "^1.18.0",
+    "@quasar/extras": "^2.0.2",
     "@turf/turf": "^6.5.0",
     "date-fns": "^2.29.1",
     "html2canvas": "^1.4.1",
     "maplibre-gl": "^3.2.1",
     "nouislider": "^15.7.1",
-    "pinia": "^2.3.1",
-    "quasar": "^2.21.0",
+    "pinia": "^3.0.4",
+    "quasar": "^2.21.2",
     "vue": "^3.5.39",
-    "vue-router": "^4.6.4"
+    "vue-router": "^5.1.0"
   },
   "devDependencies": {
-    "@quasar/app-vite": "^2.4.1",
+    "@quasar/app-vite": "^3.0.1",
     "@types/node": "^24.0.0",
     "@typescript-eslint/eslint-plugin": "^8.62.1",
     "@typescript-eslint/parser": "^8.62.1",
@@ -40,11 +40,8 @@
     "vue-tsc": "^2.2.12"
   },
   "engines": {
-    "node": "^24 || ^22 || ^20",
+    "node": "^30 || ^28 || ^26 || ^24 || ^22.22.0",
     "npm": ">= 10",
     "yarn": ">= 1.21.1"
-  },
-  "overrides": {
-    "esbuild": "0.28.1"
   }
 }
