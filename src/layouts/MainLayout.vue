@@ -299,8 +299,10 @@ async function captureCurrentPage() {
 function downloadPage() {
   if (isScreenshotting.value) return;
   isScreenshotting.value = true;
-  const previousState = genericStore.showToolbar;
+  const previousToolbar = genericStore.showToolbar;
+  const previousHeader = genericStore.showHeader;
   genericStore.showToolbar = false;
+  if (genericStore.supportHeader) genericStore.showHeader = true;
   genericStore.screenshotHandled = false;
   genericStore.screenshot = true;
 
@@ -311,7 +313,8 @@ function downloadPage() {
       stop();
       if (screenshotTimeout) clearTimeout(screenshotTimeout);
       if (screenshotFallbackTimeout) clearTimeout(screenshotFallbackTimeout);
-      genericStore.showToolbar = previousState;
+      genericStore.showToolbar = previousToolbar;
+      genericStore.showHeader = previousHeader;
       isScreenshotting.value = false;
     }
   );
@@ -483,7 +486,7 @@ onBeforeUnmount(() => {
   gap: 8px;
   padding: 12px 14px 14px;
   color: var(--swos-text-muted);
-  background: color-mix(in srgb, var(--swos-surface-soft) 68%, transparent);
+  background: var(--swos-surface-soft-muted);
   font-size: 12px;
   line-height: 1.45;
 }

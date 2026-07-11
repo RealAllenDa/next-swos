@@ -21,6 +21,7 @@
       <ComprehensiveMap
         v-model:layer-panel-open="dashboardLayerPanelOpen"
         :data="dashboardData"
+        :layer-controls-hidden="genericStore.screenshot"
       />
       <q-linear-progress
         v-if="initialLoading"
@@ -30,7 +31,7 @@
 
       <div
         :class="{
-          'dashboard-top-overlay--panel-open': dashboardLayerPanelOpen,
+          'dashboard-top-overlay--panel-open': dashboardLayerPanelVisible,
         }"
         class="dashboard-top-overlay"
       >
@@ -104,7 +105,8 @@
               <div
                 v-for="rain in rainSummary"
                 :key="rain.label"
-                class="rain-period"
+                :style="intensityStyle(rain.color)"
+                class="rain-period intensity-panel"
               >
                 <div class="rain-value">
                   <span>{{ rain.label }}</span>
@@ -125,6 +127,7 @@
 
           <router-link
             class="map-insight metric-insight wind-insight"
+            :style="windIntensityPanelStyle"
             to="/wind"
           >
             <div class="metric-icon wind-compass">
@@ -255,7 +258,7 @@ import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import ComprehensiveMap from 'components/ComprehensiveMap.vue';
 import sdk from 'src/composables/sdk';
 import {usePollingFetch, useProductionPollingFetch,} from 'src/composables/use-polling-fetch';
-import {floodStationLevel, maximumRiverLevel,} from 'src/composables/hazard-utils';
+import {floodStationLevel, hazardLevelColor, maximumRiverLevel,} from 'src/composables/hazard-utils';
 import {useGenericStore} from 'stores/generic';
 import {useQuasar} from 'quasar';
 
@@ -298,6 +301,9 @@ type StatusPhase = 'overview' | 'detail';
 const $q = useQuasar();
 const genericStore = useGenericStore();
 const dashboardLayerPanelOpen = ref($q.screen.gt.xs);
+const dashboardLayerPanelVisible = computed(
+  () => dashboardLayerPanelOpen.value && !genericStore.screenshot
+);
 
 const warningLevelLabels = ['未知', '蓝色', '黄色', '橙色', '红色'];
 const warningLevelColors = [
@@ -488,11 +494,19 @@ const rainSummary = computed(() => {
   const values = [
     {label: '近 1 小时', observations: rain1h.value?.rain ?? []},
     {label: '近 24 小时', observations: rain24h.value?.rain ?? []},
-  ].map(({label, observations}) => ({
-    label,
-    active: observations.filter((item) => item.level > 0).length,
-    maximum: Math.max(0, ...observations.map((item) => Number(item.value))),
-  }));
+  ].map(({label, observations}) => {
+    const level = Math.max(
+      0,
+      ...observations.map((item) => Number(item.level) || 0)
+    );
+    return {
+      label,
+      level,
+      color: hazardLevelColor(level),
+      active: observations.filter((item) => Number(item.level) > 0).length,
+      maximum: Math.max(0, ...observations.map((item) => Number(item.value))),
+    };
+  });
   const scale = Math.max(1, ...values.map((item) => item.maximum));
   return values.map((item) => ({
     ...item,
@@ -525,6 +539,28 @@ const maximumWind = computed<WindObservation>(() =>
 const windDirectionStyle = computed(() => ({
   transform: `rotate(${maximumWind.value.degrees}deg)`,
 }));
+const windIntensityPanelStyle = computed(() =>
+  intensityStyle(hazardLevelColor(maximumWind.value.level))
+);
+
+function colorWithAlpha(hexColor: string, alpha: number): string {
+  const normalized = hexColor.replace('#', '');
+  if (!/^[\da-f]{6}$/i.test(normalized)) return `rgba(100, 116, 139, ${alpha})`;
+  const value = Number.parseInt(normalized, 16);
+  const red = (value >> 16) & 255;
+  const green = (value >> 8) & 255;
+  const blue = value & 255;
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+function intensityStyle(color: string): Record<string, string> {
+  return {
+    '--insight-color': color,
+    '--insight-bg': colorWithAlpha(color, 0.13),
+    '--insight-bg-strong': colorWithAlpha(color, 0.24),
+    '--insight-border': colorWithAlpha(color, 0.45),
+  };
+}
 
 const inundationSummary = computed(() => {
   const points = Object.values(inundation.value?.inundation ?? {}).flat();
@@ -616,7 +652,7 @@ const weatherWarningSummary = computed<OverviewWarningSummary>(() => {
     count: effectiveWeatherWarnings.value.length,
     message: `${topWarning.district} ${topWarning.type}${
       warningLevelLabels[topWarning.level] ?? '未知'
-    }预警`,
+    }预警${(effectiveWeatherWarnings.value.length > 1) ? '等' : ''}`,
     color: warningLevelColor(topWarning.level),
   };
 });
@@ -1056,6 +1092,10 @@ onBeforeUnmount(stopStatusCycle);
 
 .status-detail {
   --status-color: #94a3b8;
+  --status-bg-subtle: rgba(148, 163, 184, 0.06);
+  --status-bg: rgba(148, 163, 184, 0.08);
+  --status-bg-title: rgba(148, 163, 184, 0.12);
+  --status-bg-hover: rgba(148, 163, 184, 0.14);
   display: grid;
   min-height: 46px;
   grid-template-columns: fit-content(320px) minmax(0, 1fr);
@@ -1071,7 +1111,7 @@ onBeforeUnmount(stopStatusCycle);
   padding: 8px 12px 8px 10px;
   border-right: 1px solid var(--swos-border);
   border-left: 3px solid var(--status-color);
-  background: color-mix(in srgb, var(--status-color) 12%, transparent);
+  background: var(--status-bg-title);
 }
 
 .status-detail-title .status-label {
@@ -1088,7 +1128,7 @@ onBeforeUnmount(stopStatusCycle);
 .status-detail-viewport {
   min-width: 0;
   overflow: hidden;
-  background: color-mix(in srgb, var(--status-color) 6%, transparent);
+  background: var(--status-bg-subtle);
 }
 
 .status-detail-marquee {
@@ -1118,26 +1158,50 @@ onBeforeUnmount(stopStatusCycle);
 
 .status-detail--positive {
   --status-color: #16a34a;
+  --status-bg-subtle: rgba(22, 163, 74, 0.06);
+  --status-bg: rgba(22, 163, 74, 0.08);
+  --status-bg-title: rgba(22, 163, 74, 0.12);
+  --status-bg-hover: rgba(22, 163, 74, 0.14);
 }
 
 .status-detail--info {
   --status-color: #0284c7;
+  --status-bg-subtle: rgba(2, 132, 199, 0.06);
+  --status-bg: rgba(2, 132, 199, 0.08);
+  --status-bg-title: rgba(2, 132, 199, 0.12);
+  --status-bg-hover: rgba(2, 132, 199, 0.14);
 }
 
 .status-detail--warning {
   --status-color: #d97706;
+  --status-bg-subtle: rgba(217, 119, 6, 0.06);
+  --status-bg: rgba(217, 119, 6, 0.08);
+  --status-bg-title: rgba(217, 119, 6, 0.12);
+  --status-bg-hover: rgba(217, 119, 6, 0.14);
 }
 
 .status-detail--negative {
   --status-color: #dc2626;
+  --status-bg-subtle: rgba(220, 38, 38, 0.06);
+  --status-bg: rgba(220, 38, 38, 0.08);
+  --status-bg-title: rgba(220, 38, 38, 0.12);
+  --status-bg-hover: rgba(220, 38, 38, 0.14);
 }
 
 .status-detail--grey {
   --status-color: #64748b;
+  --status-bg-subtle: rgba(100, 116, 139, 0.06);
+  --status-bg: rgba(100, 116, 139, 0.08);
+  --status-bg-title: rgba(100, 116, 139, 0.12);
+  --status-bg-hover: rgba(100, 116, 139, 0.14);
 }
 
 .status-item {
   --status-color: #94a3b8;
+  --status-bg-subtle: rgba(148, 163, 184, 0.06);
+  --status-bg: rgba(148, 163, 184, 0.08);
+  --status-bg-title: rgba(148, 163, 184, 0.12);
+  --status-bg-hover: rgba(148, 163, 184, 0.14);
   display: flex;
   flex: 0 0 auto;
   gap: 8px;
@@ -1148,7 +1212,7 @@ onBeforeUnmount(stopStatusCycle);
   border: 0;
   border-right: 1px solid var(--swos-border);
   border-left: 3px solid var(--status-color);
-  background: color-mix(in srgb, var(--status-color) 8%, transparent);
+  background: var(--status-bg);
   font-size: 12px;
   line-height: 1.2;
   text-decoration: none;
@@ -1156,27 +1220,47 @@ onBeforeUnmount(stopStatusCycle);
 }
 
 .status-item:hover {
-  background: color-mix(in srgb, var(--status-color) 14%, transparent);
+  background: var(--status-bg-hover);
 }
 
 .status-item--positive {
   --status-color: #16a34a;
+  --status-bg-subtle: rgba(22, 163, 74, 0.06);
+  --status-bg: rgba(22, 163, 74, 0.08);
+  --status-bg-title: rgba(22, 163, 74, 0.12);
+  --status-bg-hover: rgba(22, 163, 74, 0.14);
 }
 
 .status-item--info {
   --status-color: #0284c7;
+  --status-bg-subtle: rgba(2, 132, 199, 0.06);
+  --status-bg: rgba(2, 132, 199, 0.08);
+  --status-bg-title: rgba(2, 132, 199, 0.12);
+  --status-bg-hover: rgba(2, 132, 199, 0.14);
 }
 
 .status-item--warning {
   --status-color: #d97706;
+  --status-bg-subtle: rgba(217, 119, 6, 0.06);
+  --status-bg: rgba(217, 119, 6, 0.08);
+  --status-bg-title: rgba(217, 119, 6, 0.12);
+  --status-bg-hover: rgba(217, 119, 6, 0.14);
 }
 
 .status-item--negative {
   --status-color: #dc2626;
+  --status-bg-subtle: rgba(220, 38, 38, 0.06);
+  --status-bg: rgba(220, 38, 38, 0.08);
+  --status-bg-title: rgba(220, 38, 38, 0.12);
+  --status-bg-hover: rgba(220, 38, 38, 0.14);
 }
 
 .status-item--grey {
   --status-color: #64748b;
+  --status-bg-subtle: rgba(100, 116, 139, 0.06);
+  --status-bg: rgba(100, 116, 139, 0.08);
+  --status-bg-title: rgba(100, 116, 139, 0.12);
+  --status-bg-hover: rgba(100, 116, 139, 0.14);
 }
 
 .status-label {
@@ -1210,9 +1294,14 @@ onBeforeUnmount(stopStatusCycle);
   padding: 12px 14px;
   color: inherit;
   overflow: hidden;
-  border: 1px solid var(--swos-border);
+  border: 1px solid var(--insight-border, var(--swos-border));
   border-radius: 8px;
-  background: var(--swos-map-card);
+  background: linear-gradient(
+      135deg,
+      var(--insight-bg, transparent),
+      transparent 62%
+    ),
+    var(--swos-map-card);
   box-shadow: 0 12px 32px rgb(15 23 42 / 18%);
   backdrop-filter: blur(16px);
   text-decoration: none;
@@ -1221,7 +1310,7 @@ onBeforeUnmount(stopStatusCycle);
 }
 
 .map-insight:hover {
-  border-color: color-mix(in srgb, var(--q-primary) 50%, var(--swos-border));
+  border-color: var(--insight-color, rgba(25, 118, 210, 0.5));
   transform: translateY(-2px);
 }
 
@@ -1245,12 +1334,31 @@ onBeforeUnmount(stopStatusCycle);
   gap: 12px;
 }
 
+.rain-period {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--insight-border);
+  border-left: 4px solid var(--insight-color);
+  border-radius: 6px;
+  background: linear-gradient(
+    135deg,
+    var(--insight-bg),
+    transparent 74%
+  );
+}
+
 .rain-value {
   gap: 8px;
   font-size: 11px;
 }
 
+.rain-value span {
+  color: var(--insight-color);
+  font-weight: 700;
+}
+
 .rain-value strong {
+  color: var(--insight-color);
   font-size: 16px;
 }
 
@@ -1263,13 +1371,13 @@ onBeforeUnmount(stopStatusCycle);
   margin: 6px 0 4px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgb(59 130 246 / 14%);
+  background: var(--insight-bg-strong);
 }
 
 .rain-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #38bdf8, #2563eb, #7c3aed);
+  background: var(--insight-color);
 }
 
 .metric-insight {
@@ -1289,8 +1397,13 @@ onBeforeUnmount(stopStatusCycle);
 }
 
 .wind-compass {
-  color: #0d9488;
-  background: rgb(20 184 166 / 14%);
+  color: var(--insight-color, #0d9488);
+  background: var(--insight-bg-strong, rgb(20 184 166 / 14%));
+}
+
+.wind-insight .insight-label,
+.wind-insight strong {
+  color: var(--insight-color);
 }
 
 .water-level-icon {
@@ -1392,7 +1505,7 @@ onBeforeUnmount(stopStatusCycle);
   padding: 8px 10px;
   border: 1px solid rgb(220 38 38 / 14%);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--swos-surface) 82%, transparent);
+  background: var(--swos-surface-overlay);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 18%);
   color: inherit;
   text-decoration: none;
@@ -1521,7 +1634,6 @@ onBeforeUnmount(stopStatusCycle);
   color: var(--swos-text-muted);
   font-size: 10px;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 @media (max-width: 1200px) {

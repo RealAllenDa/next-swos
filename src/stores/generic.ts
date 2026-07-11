@@ -7,7 +7,8 @@ interface PageSpecOptions {
 
 interface VisibilityPreferences {
   showToolbar?: boolean;
-  showHeader?: boolean;
+  showHeaderDesktop?: boolean;
+  showHeaderPhone?: boolean;
   showStatusBar?: boolean;
   showInsightDock?: boolean;
 }
@@ -27,6 +28,19 @@ function loadVisibilityPreferences(): VisibilityPreferences {
 function saveVisibilityPreferences(preferences: VisibilityPreferences) {
   if (typeof localStorage === 'undefined') return;
   localStorage.setItem(VISIBILITY_STORAGE_KEY, JSON.stringify(preferences));
+}
+
+function isPhoneViewport(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(max-width: 600px)').matches;
+}
+
+function headerPreferenceKey(): 'showHeaderDesktop' | 'showHeaderPhone' {
+  return isPhoneViewport() ? 'showHeaderPhone' : 'showHeaderDesktop';
+}
+
+function defaultHeaderVisibility(): boolean {
+  return !isPhoneViewport();
 }
 
 export const useGenericStore = defineStore('generic', {
@@ -63,11 +77,12 @@ export const useGenericStore = defineStore('generic', {
         options.dashboardControlsSupported ?? false;
 
       const preferences = loadVisibilityPreferences();
+      const headerPreference = preferences[headerPreferenceKey()];
       this.showToolbar = this.supportToolbar
         ? preferences.showToolbar ?? true
         : false;
       this.showHeader = this.supportHeader
-        ? preferences.showHeader ?? true
+        ? headerPreference ?? defaultHeaderVisibility()
         : false;
       this.screenshot = false;
       this.screenshotHandled = false;
@@ -76,12 +91,17 @@ export const useGenericStore = defineStore('generic', {
       this.debuggingEnabled = false;
     },
     persistVisibility() {
-      saveVisibilityPreferences({
+      const preferences = loadVisibilityPreferences();
+      const nextPreferences: VisibilityPreferences = {
+        ...preferences,
         showToolbar: this.showToolbar,
-        showHeader: this.showHeader,
         showStatusBar: this.showStatusBar,
         showInsightDock: this.showInsightDock,
-      });
+      };
+      if (this.supportHeader) {
+        nextPreferences[headerPreferenceKey()] = this.showHeader;
+      }
+      saveVisibilityPreferences(nextPreferences);
     },
     toggleToolbar() {
       if (!this.supportToolbar) return;

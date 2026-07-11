@@ -617,6 +617,7 @@ export default defineComponent({
           zoom: props.mode === 'inundation' ? 10.5 : 8.7,
           minZoom: 4,
           maxZoom: 16,
+          preserveDrawingBuffer: true,
         })
       );
       map.value.addControl(new NavigationControl(), 'top-left');

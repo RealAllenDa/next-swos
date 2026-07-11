@@ -8,7 +8,7 @@
         <div class="text-h6">警报预报一览</div>
         <div class="text-caption text-grey-7">Warnings Overview</div>
       </div>
-      <q-space />
+      <q-space/>
       <div v-if="latestUpdate" class="update-time text-caption text-grey-7">
         更新时间：{{ latestUpdate }}
       </div>
@@ -18,7 +18,7 @@
       <section>
         <div class="section-heading">
           <div class="heading-icon weather-icon">
-            <q-icon name="fa-solid fa-triangle-exclamation" />
+            <q-icon name="fa-solid fa-triangle-exclamation"/>
           </div>
           <div>
             <div class="text-h6 text-weight-bold">天气预警</div>
@@ -26,16 +26,16 @@
               {{ weatherWarnings.length }} 条生效预警
             </div>
           </div>
-          <q-space />
-          <q-btn flat color="primary" label="查看地图" to="/warning/weather" />
+          <q-space/>
+          <q-btn color="primary" flat label="查看地图" to="/warning/weather"/>
         </div>
 
         <div v-if="weatherWarnings.length" class="warning-grid">
           <article
             v-for="warning in weatherWarnings"
             :key="warning.id"
-            class="warning-card"
             :style="{ '--warning-color': levelColor(warning.level) }"
+            class="warning-card"
           >
             <div class="warning-card-top">
               <div>
@@ -45,27 +45,29 @@
                 </div>
               </div>
               <q-badge
-                rounded
+                :label="levelLabel(warning.level)"
                 :style="{ backgroundColor: levelColor(warning.level) }"
                 :text-color="
                   warning.level === 2 || warning.level === 3 ? 'dark' : 'white'
                 "
-                :label="levelLabel(warning.level)"
+                rounded
               />
             </div>
             <div class="warning-meta">
-              <span><q-icon name="campaign" /> {{ warning.name }}</span>
-              <span><q-icon name="schedule" /> {{ warning.time }}</span>
+              <span><q-icon name="campaign"/> {{ warning.name }}</span>
+              <span><q-icon name="schedule"/> {{ warning.time }}</span>
             </div>
             <p class="warning-detail">
               {{ warning.detail || '暂无详细说明。' }}
             </p>
           </article>
         </div>
-        <q-banner v-else-if="!weatherLoading" rounded class="empty-state">
+        <q-banner v-else-if="!weatherLoading" class="empty-state" rounded>
           <template #avatar
-            ><q-icon name="verified" color="positive"
-          /></template>
+          >
+            <q-icon color="positive" name="verified"
+            />
+          </template>
           当前没有生效的天气预警。
         </q-banner>
       </section>
@@ -73,24 +75,24 @@
       <section>
         <div class="section-heading">
           <div class="heading-icon flood-icon">
-            <q-icon name="fa-solid fa-water" />
+            <q-icon name="fa-solid fa-water"/>
           </div>
           <div>
             <div class="text-h6 text-weight-bold">防汛预警</div>
             <div class="text-caption text-grey-7">全部防汛响应与高潮位预警</div>
           </div>
-          <q-space />
-          <q-btn flat color="primary" label="查看地图" to="/warning/flood" />
+          <q-space/>
+          <q-btn color="primary" flat label="查看地图" to="/warning/flood"/>
         </div>
 
         <div class="flood-grid">
           <article
             v-for="warning in floodWarnings"
             :key="warning.id"
-            class="flood-card"
             :style="{ '--warning-color': levelColor(warning.level) }"
+            class="flood-card"
           >
-            <q-icon :name="warning.icon" class="flood-card-icon" />
+            <q-icon :name="warning.icon" class="flood-card-icon"/>
             <div class="col">
               <div class="text-subtitle1 text-weight-bold">
                 {{ warning.title }}
@@ -102,22 +104,22 @@
             <div class="flood-level">
               <strong>{{ levelLabel(warning.level) }}</strong>
               <span>{{
-                warning.level ? `${warning.level} 级` : '未发布'
-              }}</span>
+                  warning.level ? `${5 - warning.level} 级` : '未发布'
+                }}</span>
             </div>
           </article>
         </div>
       </section>
     </main>
 
-    <q-inner-loading :showing="weatherLoading || floodLoading" />
+    <q-inner-loading :showing="weatherLoading || floodLoading"/>
   </q-page>
 </template>
 
-<script setup lang="ts">
-import { computed } from 'vue';
-import { useProductionPollingFetch } from 'src/composables/use-polling-fetch';
-import { useGenericStore } from 'stores/generic';
+<script lang="ts" setup>
+import {computed} from 'vue';
+import {useProductionPollingFetch} from 'src/composables/use-polling-fetch';
+import {useGenericStore} from 'stores/generic';
 
 interface WeatherWarningItem extends WeatherWarning {
   id: string;
@@ -133,9 +135,9 @@ interface FloodWarningItem {
 }
 
 const excludedDistricts = new Set(['江苏省', '浙江省']);
-const { data: weather, loading: weatherLoading } =
+const {data: weather, loading: weatherLoading} =
   useProductionPollingFetch<WeatherWarningList>('/warning/weather_warning');
-const { data: flood, loading: floodLoading } =
+const {data: flood, loading: floodLoading} =
   useProductionPollingFetch<FloodWarningState>('/warning/flood_warning');
 
 const weatherWarnings = computed<WeatherWarningItem[]>(() =>

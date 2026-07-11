@@ -86,9 +86,7 @@ import {
 import 'maplibre-gl/dist/maplibre-gl.css';
 import MapControl from 'components/MLMapControl.vue';
 import PrecipFcstLegend from 'components/PrecipFcstLegend.vue';
-import {useGenericStore} from 'stores/generic';
 import {format} from 'date-fns';
-import html2canvas from 'html2canvas';
 import {useQuasar} from 'quasar';
 import {applyBaseMapTheme, createBaseMapStyle} from 'src/maps/base-style';
 import {addUserLocationControl} from 'src/maps/user-location-control';
@@ -100,7 +98,6 @@ export default defineComponent({
     const isDesktopLayout = computed(() => {
       return $q.screen.gt.sm;
     });
-    const genericStore = useGenericStore();
     const precipitationStore = usePrecipitationStore();
     const map = shallowRef<Map>();
     const mapStyleReady = ref(false);
@@ -763,35 +760,6 @@ export default defineComponent({
       }),
       () => {
         setRainMeasurementsVisibility();
-      }
-    );
-
-    watch(
-      computed(() => {
-        return genericStore.screenshot;
-      }),
-      async () => {
-        if (!genericStore.screenshot || !mapContainer.value) return;
-        genericStore.screenshotHandled = true;
-        try {
-          const pngImage = (
-            await html2canvas(mapContainer.value, {
-              backgroundColor: $q.dark.isActive ? '#07111f' : '#fff',
-            })
-          ).toDataURL();
-          const anchor = document.createElement('a');
-          anchor.setAttribute('href', pngImage);
-          anchor.setAttribute(
-            'download',
-            `SWoS_PrecipForecast_${format(
-              new Date(),
-              'yyyy_MM_dd_HH_mm_ss'
-            )}.png`
-          );
-          anchor.click();
-        } finally {
-          genericStore.screenshot = false;
-        }
       }
     );
 

@@ -11,9 +11,11 @@ $no-warning: #c8c8cb;
   --swos-page: #f4f7fa;
   --swos-surface: #ffffff;
   --swos-surface-soft: #f8fafc;
+  --swos-surface-soft-muted: rgba(248, 250, 252, 0.68);
+  --swos-surface-overlay: rgba(255, 255, 255, 0.82);
   --swos-border: #dce4ec;
   --swos-text-muted: #64748b;
-  --swos-map-card: rgb(255 255 255 / 94%);
+  --swos-map-card: rgba(255, 255, 255, 0.94);
 }
 
 body.body--dark {
@@ -21,9 +23,11 @@ body.body--dark {
   --swos-page: #07111f;
   --swos-surface: #101c2c;
   --swos-surface-soft: #132235;
+  --swos-surface-soft-muted: rgba(19, 34, 53, 0.68);
+  --swos-surface-overlay: rgba(16, 28, 44, 0.82);
   --swos-border: #2a3b50;
   --swos-text-muted: #9fb0c3;
-  --swos-map-card: rgb(16 28 44 / 94%);
+  --swos-map-card: rgba(16, 28, 44, 0.94);
   background: var(--swos-page);
 }
 

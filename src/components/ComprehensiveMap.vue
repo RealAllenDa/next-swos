@@ -3,7 +3,7 @@
     <div ref="mapContainer" class="overview-map"></div>
 
     <q-btn
-      v-if="!layerPanelOpen"
+      v-if="!layerControlsHidden && !layerPanelOpen"
       aria-label="打开综合图层"
       class="layer-toggle"
       color="primary"
@@ -14,7 +14,11 @@
       <q-tooltip>综合图层</q-tooltip>
     </q-btn>
 
-    <q-card v-show="layerPanelOpen" bordered class="layer-panel">
+    <q-card
+      v-show="!layerControlsHidden && layerPanelOpen"
+      bordered
+      class="layer-panel"
+    >
       <q-card-section class="q-pa-sm">
         <div class="row items-center no-wrap">
           <div>
@@ -124,8 +128,12 @@ import {
 } from 'src/composables/hazard-utils';
 
 const props = withDefaults(
-  defineProps<{ data: DashboardData; layerPanelOpen?: boolean }>(),
-  { layerPanelOpen: undefined }
+  defineProps<{
+    data: DashboardData;
+    layerPanelOpen?: boolean;
+    layerControlsHidden?: boolean;
+  }>(),
+  { layerPanelOpen: undefined, layerControlsHidden: false }
 );
 const emit = defineEmits<{
   (event: 'update:layerPanelOpen', value: boolean): void;
@@ -1282,6 +1290,7 @@ onMounted(() => {
       zoom: 8.7,
       minZoom: 3,
       maxZoom: 16,
+      preserveDrawingBuffer: true,
     })
   );
   map.value.addControl(new NavigationControl(), 'bottom-left');

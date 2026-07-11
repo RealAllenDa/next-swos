@@ -450,6 +450,7 @@ export default defineComponent({
           style: createBaseMapStyle($q.dark.isActive),
           center: [120.29, 31.59],
           zoom: 4.5,
+          preserveDrawingBuffer: true,
         })
       );
       map.value.addControl(new NavigationControl(), 'top-left');

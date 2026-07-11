@@ -185,6 +185,7 @@ export default defineComponent({
           style: createBaseMapStyle($q.dark.isActive),
           center: [121.51, 31.26],
           zoom: 8.8,
+          preserveDrawingBuffer: true,
         })
       );
       map.value.addControl(new NavigationControl(), 'top-left');
