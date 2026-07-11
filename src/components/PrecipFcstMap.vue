@@ -58,9 +58,7 @@
           class="legend-description-sub row"
         >
           <span
-          >{{
-              precipitationStore.selectedDuration.replace('h', '')
-            }}小时站点观测</span
+          >站点观测</span
           >
           <span>{{ precipitationStore.rainMeasurementsTime }}</span>
         </div>
@@ -105,6 +103,7 @@ export default defineComponent({
     const genericStore = useGenericStore();
     const precipitationStore = usePrecipitationStore();
     const map = shallowRef<Map>();
+    const mapStyleReady = ref(false);
     const mapContainer = shallowRef<HTMLElement>();
     const hoverPopup = new Popup({
       closeButton: false,
@@ -114,14 +113,6 @@ export default defineComponent({
     });
 
     const currentData = computed(() => precipitationStore.currentData);
-    const dataChanged = computed({
-      get() {
-        return precipitationStore.dataChanged;
-      },
-      set(value: boolean) {
-        precipitationStore.dataChanged = value;
-      },
-    });
     const torrentialRainDisplay = computed(
       () => precipitationStore.displayTorrentialRain
     );
@@ -140,6 +131,7 @@ export default defineComponent({
     const rainLayerInitialized = ref(false);
     let rainLayerRefreshToken = 0;
     let rainLayerLoadedToken = 0;
+    let rainLayerLoadingFallback: number | undefined;
     let rainMeasurementsRefreshToken = 0;
     const torrentialRainLayerInitialized = ref(false);
     const rainMeasurementsLayerInitialized = ref(false);
@@ -663,7 +655,20 @@ export default defineComponent({
 
     function refreshRainLayer() {
       rainLayerRefreshToken += 1;
+      const refreshToken = rainLayerRefreshToken;
       precipitationStore.mapIsLoading = true;
+      if (rainLayerLoadingFallback) {
+        window.clearTimeout(rainLayerLoadingFallback);
+      }
+      rainLayerLoadingFallback = window.setTimeout(() => {
+        const currentMap = map.value;
+        if (
+          refreshToken === rainLayerRefreshToken &&
+          (!currentMap?.getSource('rain') || currentMap.isSourceLoaded('rain'))
+        ) {
+          finishRainLayerLoading(refreshToken);
+        }
+      }, 10_000);
       if (!rainLayerInitialized.value) {
         map.value?.addSource('rain', {
           type: 'geojson',
@@ -692,6 +697,18 @@ export default defineComponent({
       }
     }
 
+    function finishRainLayerLoading(refreshToken = rainLayerRefreshToken) {
+      if (refreshToken !== rainLayerRefreshToken) {
+        return;
+      }
+      rainLayerLoadedToken = refreshToken;
+      if (rainLayerLoadingFallback) {
+        window.clearTimeout(rainLayerLoadingFallback);
+        rainLayerLoadingFallback = undefined;
+      }
+      precipitationStore.mapIsLoading = false;
+    }
+
     watch(
       computed(() => {
         return precipitationStore.isInPlayback;
@@ -706,15 +723,12 @@ export default defineComponent({
       }
     );
 
-    watch(dataChanged, () => {
-      if (!dataChanged.value) {
-        return;
-      }
+    function refreshMapLayersForCurrentData() {
       if (
         currentData.value === undefined ||
         currentData.value === null ||
         map.value === undefined ||
-        !map.value.isStyleLoaded() ||
+        !mapStyleReady.value ||
         !precipitationStore.initialized
       ) {
         return;
@@ -723,8 +737,18 @@ export default defineComponent({
       refreshTorrentialRain();
       refreshGpv();
       refreshRainMeasurements();
-      dataChanged.value = false;
-    });
+      precipitationStore.dataChanged = false;
+    }
+
+    watch(
+      [
+        currentData,
+        () => precipitationStore.initialized,
+        () => precipitationStore.selectedDuration,
+        () => precipitationStore.selectedResolution,
+      ],
+      refreshMapLayersForCurrentData
+    );
 
     watch(torrentialRainDisplay, refreshTorrentialRain);
     watch(gpvDisplay, refreshGpv);
@@ -808,32 +832,32 @@ export default defineComponent({
         if (e.sourceId !== 'rain') {
           return;
         }
-        if (
-          !e.isSourceLoaded ||
-          map.value?.isSourceLoaded('rain') !== true
-        ) {
-          precipitationStore.mapIsLoading = true;
+        if (!e.isSourceLoaded) {
           return;
         }
         const refreshToken = rainLayerRefreshToken;
         if (rainLayerLoadedToken === refreshToken) {
           return;
         }
-        rainLayerLoadedToken = refreshToken;
-        precipitationStore.mapIsLoading = false;
+        finishRainLayerLoading(refreshToken);
+      });
+      map.value.on('error', (event) => {
+        if ((event as { sourceId?: string }).sourceId === 'rain') {
+          finishRainLayerLoading();
+        }
       });
       map.value.once('load', () => {
-        if (precipitationStore.dataChanged) {
-          refreshRainLayer();
-          refreshTorrentialRain();
-          refreshGpv();
-          refreshRainMeasurements();
-          precipitationStore.dataChanged = false;
-        }
+        mapStyleReady.value = true;
+        refreshMapLayersForCurrentData();
       });
     });
 
-    onBeforeUnmount(() => map.value?.remove());
+    onBeforeUnmount(() => {
+      if (rainLayerLoadingFallback) {
+        window.clearTimeout(rainLayerLoadingFallback);
+      }
+      map.value?.remove();
+    });
 
     return {
       isDesktopLayout,
