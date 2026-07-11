@@ -1,5 +1,8 @@
 <template>
-  <q-page class="dashboard-page column no-wrap">
+  <q-page
+    :class="{ 'dashboard-page--screenshot': genericStore.screenshot }"
+    class="dashboard-page column no-wrap"
+  >
     <section
       :class="{ 'dashboard-header--compact': !genericStore.showHeader }"
       class="dashboard-header row items-center q-px-lg q-py-md"
@@ -176,10 +179,14 @@
             </div>
             <q-carousel
               v-model="activeTyphoonSlide"
+              :animated="!genericStore.screenshot"
               :arrows="activeTyphoonSummaries.length > 1"
-              :autoplay="activeTyphoonSummaries.length > 1 ? 6500 : false"
+              :autoplay="
+                !genericStore.screenshot && activeTyphoonSummaries.length > 1
+                  ? 6500
+                  : false
+              "
               :navigation="activeTyphoonSummaries.length > 1"
-              animated
               class="typhoon-carousel"
               control-color="negative"
               height="92px"
@@ -304,6 +311,7 @@ const dashboardLayerPanelOpen = ref($q.screen.gt.xs);
 const dashboardLayerPanelVisible = computed(
   () => dashboardLayerPanelOpen.value && !genericStore.screenshot
 );
+let previousDashboardLayerPanelOpen: boolean | undefined;
 
 const warningLevelLabels = ['未知', '蓝色', '黄色', '橙色', '红色'];
 const warningLevelColors = [
@@ -358,6 +366,20 @@ function formatTyphoonLocation(point: TyphoonPoints): string {
 genericStore.initPageSpec(false, true, false, {
   dashboardControlsSupported: true,
 });
+watch(
+  () => genericStore.screenshot,
+  (screenshotting) => {
+    if (screenshotting) {
+      previousDashboardLayerPanelOpen = dashboardLayerPanelOpen.value;
+      dashboardLayerPanelOpen.value = false;
+      return;
+    }
+    if (previousDashboardLayerPanelOpen === undefined) return;
+    dashboardLayerPanelOpen.value = previousDashboardLayerPanelOpen;
+    previousDashboardLayerPanelOpen = undefined;
+  },
+  {flush: 'sync'}
+);
 const {data: geography, loading: geographyLoading} =
   useProductionPollingFetch<HazardGeoJSON>(
     '/assets/generic/around_shanghai_geojson',
@@ -1024,6 +1046,26 @@ onBeforeUnmount(stopStatusCycle);
 
 .dashboard-top-overlay--panel-open {
   right: 298px;
+}
+
+.dashboard-page--screenshot .dashboard-top-overlay {
+  right: 16px !important;
+  transition: none;
+}
+
+.dashboard-page--screenshot :deep(.typhoon-carousel),
+.dashboard-page--screenshot :deep(.typhoon-carousel .q-panel),
+.dashboard-page--screenshot :deep(.typhoon-carousel .q-carousel__slides-container),
+.dashboard-page--screenshot :deep(.typhoon-carousel .q-carousel__slide) {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.dashboard-page--screenshot :deep(.typhoon-carousel .q-carousel__control),
+.dashboard-page--screenshot :deep(.typhoon-carousel .q-focus-helper) {
+  display: none !important;
 }
 
 .status-bar {

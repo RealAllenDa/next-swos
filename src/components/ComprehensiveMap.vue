@@ -15,7 +15,7 @@
     </q-btn>
 
     <q-card
-      v-show="!layerControlsHidden && layerPanelOpen"
+      v-if="!layerControlsHidden && layerPanelOpen"
       bordered
       class="layer-panel"
     >
