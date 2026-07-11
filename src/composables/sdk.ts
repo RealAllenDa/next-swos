@@ -25,13 +25,6 @@ class SDK {
       `${LOGO}\n` + `Version ${VERSION}-${ENVIRONMENT}. `,
       `color: ${this.logColor}; font-size: 20px; font-weight: bold;`
     );
-    if (this.useProductionAPI) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        '%c!!! Using Production API Server.',
-        'color: orange; font-size: 20px; font-weight: bold;'
-      );
-    }
   }
 
   resolveUrl(url: string, useCustomPrefix = false): string {
