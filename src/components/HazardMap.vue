@@ -32,6 +32,9 @@ import { applyBaseMapTheme, createBaseMapStyle } from 'src/maps/base-style';
 import { addUserLocationControl } from 'src/maps/user-location-control';
 import {
   emptyFeatureCollection,
+  EXTREME_RAIN_BORDER_COLOR,
+  EXTREME_RAIN_FILL_COLOR,
+  EXTREME_RAIN_LEVEL,
   floodLevelLabel,
   floodStationLevel,
   hazardLevelColor,
@@ -97,9 +100,15 @@ export default defineComponent({
       5,
       '#b31ab1',
       6,
-      '#111827',
+      EXTREME_RAIN_FILL_COLOR,
       '#9ca3af',
     ] as ExpressionSpecification;
+
+    const extremeRainCondition: ExpressionSpecification = [
+      '==',
+      ['get', 'level'],
+      EXTREME_RAIN_LEVEL,
+    ];
 
     function cloneCollection(value: HazardGeoJSON | null): FeatureCollection {
       if (!value || value.type !== 'FeatureCollection')
@@ -485,14 +494,29 @@ export default defineComponent({
         source: 'hazard-areas',
         paint: {
           'fill-color': levelColor,
-          'fill-opacity': ['case', ['>', ['get', 'level'], 0], 0.42, 0.08],
+          'fill-opacity': [
+            'case',
+            extremeRainCondition,
+            0.72,
+            ['>', ['get', 'level'], 0],
+            0.42,
+            0.08,
+          ],
         },
       });
       map.value.addLayer({
         id: 'hazard-area-outline',
         type: 'line',
         source: 'hazard-areas',
-        paint: { 'line-color': '#4b5563', 'line-width': 1 },
+        paint: {
+          'line-color': [
+            'case',
+            extremeRainCondition,
+            EXTREME_RAIN_BORDER_COLOR,
+            '#4b5563',
+          ],
+          'line-width': ['case', extremeRainCondition, 2.5, 1],
+        },
       });
       map.value.addLayer({
         id: 'hazard-river-lines',
@@ -533,7 +557,8 @@ export default defineComponent({
           ],
           'circle-blur': 0.72,
           'circle-opacity': ['get', 'opacity'],
-          'circle-stroke-width': 0,
+          'circle-stroke-color': EXTREME_RAIN_BORDER_COLOR,
+          'circle-stroke-width': ['case', extremeRainCondition, 2.5, 0],
         },
       });
       map.value.addLayer({
@@ -543,8 +568,13 @@ export default defineComponent({
         paint: {
           'circle-color': levelColor,
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 7, 4, 12, 9],
-          'circle-stroke-color': '#fff',
-          'circle-stroke-width': 1.5,
+          'circle-stroke-color': [
+            'case',
+            extremeRainCondition,
+            EXTREME_RAIN_BORDER_COLOR,
+            '#fff',
+          ],
+          'circle-stroke-width': ['case', extremeRainCondition, 2.5, 1.5],
           'circle-opacity': ['case', ['>', ['get', 'level'], 0], 0.95, 0.35],
         },
       });

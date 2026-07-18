@@ -6,6 +6,10 @@ import type {
   Point,
 } from 'geojson';
 
+export const EXTREME_RAIN_LEVEL = 6;
+export const EXTREME_RAIN_FILL_COLOR = '#000000';
+export const EXTREME_RAIN_BORDER_COLOR = '#ffea00';
+
 export const HAZARD_COLORS = [
   '#9ca3af',
   '#1e90ff',
@@ -13,7 +17,7 @@ export const HAZARD_COLORS = [
   '#f59e0b',
   '#ef4444',
   '#b31ab1',
-  '#111827',
+  EXTREME_RAIN_FILL_COLOR,
 ];
 
 const rainColorThresholds = {
@@ -25,7 +29,7 @@ const rainColorThresholds = {
     [20, 30, '#FFF500'],
     [30, 40, '#FF9900'],
     [40, 50, '#FF2800'],
-    [50, Infinity, '#B40068'],
+    [50, Infinity, EXTREME_RAIN_FILL_COLOR],
   ],
   '3h': [
     [1, 10, '#F2F2FF'],
@@ -35,7 +39,7 @@ const rainColorThresholds = {
     [50, 60, '#FFF500'],
     [60, 80, '#FF9900'],
     [80, 100, '#FF2800'],
-    [100, Infinity, '#B40068'],
+    [100, Infinity, EXTREME_RAIN_FILL_COLOR],
   ],
   '24h': [
     [1, 25, '#F2F2FF'],
@@ -45,7 +49,7 @@ const rainColorThresholds = {
     [100, 150, '#FFF500'],
     [150, 200, '#FF9900'],
     [200, 250, '#FF2800'],
-    [250, Infinity, '#B40068'],
+    [250, Infinity, EXTREME_RAIN_FILL_COLOR],
   ],
 } as const;
 

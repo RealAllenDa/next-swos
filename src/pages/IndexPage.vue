@@ -108,7 +108,7 @@
               <div
                 v-for="rain in rainSummary"
                 :key="rain.label"
-                :style="intensityStyle(rain.color)"
+                :style="intensityStyle(rain.color, rain.level)"
                 class="rain-period intensity-panel"
               >
                 <div class="rain-value">
@@ -265,7 +265,14 @@ import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import ComprehensiveMap from 'components/ComprehensiveMap.vue';
 import sdk from 'src/composables/sdk';
 import {usePollingFetch, useProductionPollingFetch,} from 'src/composables/use-polling-fetch';
-import {floodStationLevel, hazardLevelColor, maximumRiverLevel,} from 'src/composables/hazard-utils';
+import {
+  EXTREME_RAIN_BORDER_COLOR,
+  EXTREME_RAIN_FILL_COLOR,
+  EXTREME_RAIN_LEVEL,
+  floodStationLevel,
+  hazardLevelColor,
+  maximumRiverLevel,
+} from 'src/composables/hazard-utils';
 import {useGenericStore} from 'stores/generic';
 import {useQuasar} from 'quasar';
 
@@ -575,7 +582,22 @@ function colorWithAlpha(hexColor: string, alpha: number): string {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
-function intensityStyle(color: string): Record<string, string> {
+function intensityStyle(color: string, level?: number): Record<string, string> {
+  if (level === EXTREME_RAIN_LEVEL) {
+    return {
+      '--insight-color': EXTREME_RAIN_FILL_COLOR,
+      '--insight-bg': EXTREME_RAIN_FILL_COLOR,
+      '--insight-bg-strong': colorWithAlpha(EXTREME_RAIN_BORDER_COLOR, 0.24),
+      '--insight-border': EXTREME_RAIN_BORDER_COLOR,
+      '--rain-period-accent': EXTREME_RAIN_BORDER_COLOR,
+      '--rain-period-bg': EXTREME_RAIN_FILL_COLOR,
+      '--rain-period-border': EXTREME_RAIN_BORDER_COLOR,
+      '--rain-period-note': colorWithAlpha(EXTREME_RAIN_BORDER_COLOR, 0.82),
+      '--rain-period-text': EXTREME_RAIN_BORDER_COLOR,
+      '--rain-track-bg': colorWithAlpha(EXTREME_RAIN_BORDER_COLOR, 0.24),
+    };
+  }
+
   return {
     '--insight-color': color,
     '--insight-bg': colorWithAlpha(color, 0.13),
@@ -1379,13 +1401,12 @@ onBeforeUnmount(stopStatusCycle);
 .rain-period {
   min-width: 0;
   padding: 8px 10px;
-  border: 1px solid var(--insight-border);
-  border-left: 4px solid var(--insight-color);
+  border: 1px solid var(--rain-period-border, var(--insight-border));
+  border-left: 4px solid var(--rain-period-accent, var(--insight-color));
   border-radius: 6px;
-  background: linear-gradient(
-    135deg,
-    var(--insight-bg),
-    transparent 74%
+  background: var(
+    --rain-period-bg,
+    linear-gradient(135deg, var(--insight-bg), transparent 74%)
   );
 }
 
@@ -1395,12 +1416,12 @@ onBeforeUnmount(stopStatusCycle);
 }
 
 .rain-value span {
-  color: var(--insight-color);
+  color: var(--rain-period-text, var(--insight-color));
   font-weight: 700;
 }
 
 .rain-value strong {
-  color: var(--insight-color);
+  color: var(--rain-period-text, var(--insight-color));
   font-size: 16px;
 }
 
@@ -1413,13 +1434,17 @@ onBeforeUnmount(stopStatusCycle);
   margin: 6px 0 4px;
   overflow: hidden;
   border-radius: 999px;
-  background: var(--insight-bg-strong);
+  background: var(--rain-track-bg, var(--insight-bg-strong));
 }
 
 .rain-fill {
   height: 100%;
   border-radius: inherit;
-  background: var(--insight-color);
+  background: var(--rain-period-accent, var(--insight-color));
+}
+
+.rain-period .insight-note {
+  color: var(--rain-period-note, var(--swos-text-muted));
 }
 
 .metric-insight {

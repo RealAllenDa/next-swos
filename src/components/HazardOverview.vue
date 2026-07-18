@@ -67,7 +67,7 @@
               <q-item-label header class="row items-center">
                 <span
                   class="level-dot q-mr-sm"
-                  :style="{ backgroundColor: levelColor(group.level) }"
+                  :style="levelDotStyle(group.level)"
                 ></span>
                 {{ levelLabel(group.level) }}（{{ group.items.length }}）
               </q-item-label>
@@ -107,6 +107,8 @@ import HazardMap from 'components/HazardMap.vue';
 import FloodStationHistory from 'components/FloodStationHistory.vue';
 import { useProductionPollingFetch } from 'src/composables/use-polling-fetch';
 import {
+  EXTREME_RAIN_BORDER_COLOR,
+  EXTREME_RAIN_LEVEL,
   floodStationLevel,
   HAZARD_COLORS,
   maximumRiverLevel,
@@ -314,6 +316,17 @@ export default defineComponent({
       return HAZARD_COLORS[level] ?? HAZARD_COLORS[0];
     }
 
+    function levelDotStyle(level: number): Record<string, string> {
+      const isExtremeRain = level === EXTREME_RAIN_LEVEL;
+      return {
+        backgroundColor: levelColor(level),
+        borderColor: isExtremeRain
+          ? EXTREME_RAIN_BORDER_COLOR
+          : 'rgb(0 0 0 / 25%)',
+        borderWidth: isExtremeRain ? '2px' : '1px',
+      };
+    }
+
     function openStation(station: string) {
       if (props.config.mode !== 'flood-stations') return;
       selectedStation.value = station;
@@ -343,6 +356,7 @@ export default defineComponent({
       visibleGroups,
       levelLabel,
       levelColor,
+      levelDotStyle,
       selectedStation,
       historyOpen,
       showHeader,
@@ -391,6 +405,7 @@ export default defineComponent({
 }
 
 .level-dot {
+  box-sizing: border-box;
   width: 12px;
   height: 12px;
   border: 1px solid rgb(0 0 0 / 25%);

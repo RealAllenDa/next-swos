@@ -118,6 +118,9 @@ import { applyBaseMapTheme, createBaseMapStyle } from 'src/maps/base-style';
 import { addUserLocationControl } from 'src/maps/user-location-control';
 import {
   emptyFeatureCollection,
+  EXTREME_RAIN_BORDER_COLOR,
+  EXTREME_RAIN_FILL_COLOR,
+  EXTREME_RAIN_LEVEL,
   floodLevelLabel,
   floodStationLevel,
   hazardLevelColor,
@@ -231,6 +234,10 @@ function rainCollection(
   (state?.rain ?? []).forEach((item) => {
     const level = usePeriod ? item.period ?? 0 : item.level;
     if (level === 0 || !validCoordinate(item.longitude, item.latitude)) return;
+    const measurementColor = rainMeasurementColor(Number(item.value), duration);
+    const isExtremeRain =
+      level === EXTREME_RAIN_LEVEL ||
+      measurementColor === EXTREME_RAIN_FILL_COLOR;
     collection.features.push(
       pointFeature(item.longitude, item.latitude, {
         category: '降雨',
@@ -239,7 +246,8 @@ function rainCollection(
         detail: `${item.value} mm`,
         value: Number(item.value),
         label: Number(item.value).toFixed(1),
-        color: rainMeasurementColor(Number(item.value), duration),
+        color: isExtremeRain ? EXTREME_RAIN_FILL_COLOR : measurementColor,
+        extremeRain: isExtremeRain,
         level,
       })
     );
@@ -496,10 +504,11 @@ function drawRainDrop(
   context: CanvasRenderingContext2D,
   size: number,
   fill: string,
-  accent: string
+  accent: string,
+  stroke = '#ffffff'
 ) {
   context.fillStyle = fill;
-  context.strokeStyle = '#ffffff';
+  context.strokeStyle = stroke;
   context.lineWidth = 4;
   context.beginPath();
   context.moveTo(size * 0.5, size * 0.1);
@@ -541,6 +550,19 @@ function registerDashboardIcons(currentMap: Map) {
   addDashboardIcon(currentMap, 'dashboard-icon-rain-1h', (context, size) => {
     drawRainDrop(context, size, '#2563eb', '#bae6fd');
   });
+  addDashboardIcon(
+    currentMap,
+    'dashboard-icon-rain-1h-extreme',
+    (context, size) => {
+      drawRainDrop(
+        context,
+        size,
+        EXTREME_RAIN_FILL_COLOR,
+        EXTREME_RAIN_BORDER_COLOR,
+        EXTREME_RAIN_BORDER_COLOR
+      );
+    }
+  );
   addDashboardIcon(currentMap, 'dashboard-icon-rain-24h', (context, size) => {
     drawRainDrop(context, size, '#7c3aed', '#facc15');
     context.shadowBlur = 0;
@@ -550,6 +572,25 @@ function registerDashboardIcons(currentMap: Map) {
     context.textBaseline = 'middle';
     context.fillText('24', size * 0.5, size * 0.62);
   });
+  addDashboardIcon(
+    currentMap,
+    'dashboard-icon-rain-24h-extreme',
+    (context, size) => {
+      drawRainDrop(
+        context,
+        size,
+        EXTREME_RAIN_FILL_COLOR,
+        EXTREME_RAIN_BORDER_COLOR,
+        EXTREME_RAIN_BORDER_COLOR
+      );
+      context.shadowBlur = 0;
+      context.fillStyle = EXTREME_RAIN_BORDER_COLOR;
+      context.font = 'bold 16px Roboto, sans-serif';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText('24', size * 0.5, size * 0.62);
+    }
+  );
   addDashboardIcon(currentMap, 'dashboard-icon-wind', (context, size) => {
     context.fillStyle = '#0d9488';
     context.strokeStyle = '#ffffff';
@@ -919,7 +960,7 @@ function addSourcesAndLayers() {
     5,
     '#b31ab1',
     6,
-    '#111827',
+    EXTREME_RAIN_FILL_COLOR,
     '#9ca3af',
   ];
   currentMap.addLayer({
@@ -1003,14 +1044,16 @@ function addSourcesAndLayers() {
     'dashboard-rain-24h',
     'dashboard-rain-24h',
     'dashboard-icon-rain-24h',
-    visibleLayers.rain24h
+    visibleLayers.rain24h,
+    'dashboard-icon-rain-24h-extreme'
   );
   addRainSymbolLayer(
     currentMap,
     'dashboard-rain-1h',
     'dashboard-rain-1h',
     'dashboard-icon-rain-1h',
-    visibleLayers.rain1h
+    visibleLayers.rain1h,
+    'dashboard-icon-rain-1h-extreme'
   );
   addIconSymbolLayer(
     currentMap,
@@ -1059,8 +1102,14 @@ function addRainSymbolLayer(
   id: string,
   source: string,
   iconImage: string,
-  visible = true
+  visible = true,
+  extremeIconImage = iconImage
 ) {
+  const extremeRainCondition: ExpressionSpecification = [
+    'boolean',
+    ['get', 'extremeRain'],
+    false,
+  ];
   currentMap.addLayer({
     id,
     type: 'symbol',
@@ -1068,7 +1117,12 @@ function addRainSymbolLayer(
     layout: {
       visibility: visible ? 'visible' : 'none',
       'symbol-sort-key': ['-', 0, ['to-number', ['get', 'value']]],
-      'icon-image': iconImage,
+      'icon-image': [
+        'case',
+        extremeRainCondition,
+        extremeIconImage,
+        iconImage,
+      ],
       'icon-size': ['interpolate', ['linear'], ['zoom'], 7, 0.48, 12, 0.72],
       'icon-allow-overlap': true,
       'icon-ignore-placement': true,
@@ -1081,8 +1135,13 @@ function addRainSymbolLayer(
     },
     paint: {
       'text-color': ['get', 'color'],
-      'text-halo-color': '#707070',
-      'text-halo-width': 1,
+      'text-halo-color': [
+        'case',
+        extremeRainCondition,
+        EXTREME_RAIN_BORDER_COLOR,
+        '#707070',
+      ],
+      'text-halo-width': ['case', extremeRainCondition, 2, 1],
       'text-halo-blur': 1,
     },
   });
