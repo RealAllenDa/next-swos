@@ -71,7 +71,7 @@
 import {computed, defineComponent, markRaw, onBeforeUnmount, onMounted, ref, shallowRef, watch,} from 'vue';
 import {usePrecipitationStore} from 'stores/precipitation';
 import sdk from 'src/composables/sdk';
-import type {FeatureCollection} from '@turf/turf';
+import type {Feature, FeatureCollection, Polygon} from 'geojson';
 import * as turf from '@turf/turf';
 import {round} from '@turf/turf';
 import {
@@ -90,6 +90,17 @@ import {format} from 'date-fns';
 import {useQuasar} from 'quasar';
 import {applyBaseMapTheme, createBaseMapStyle} from 'src/maps/base-style';
 import {addUserLocationControl} from 'src/maps/user-location-control';
+
+const RADAR_COVERAGE_MASK_SOURCE_ID = 'radar-coverage-mask';
+const RADAR_COVERAGE_MASK_LAYER_ID = 'radar-coverage-mask';
+const RADAR_COVERAGE_TILE_ZOOM = 7;
+const WEB_MERCATOR_MAX_LATITUDE = 85.05112878;
+const RADAR_COVERAGE_TILES = [
+  {x: 106, y: 51},
+  {x: 107, y: 51},
+  {x: 106, y: 52},
+  {x: 107, y: 52},
+];
 
 export default defineComponent({
   components: {MapControl, PrecipFcstLegend},
@@ -134,6 +145,99 @@ export default defineComponent({
     const rainMeasurementsLayerInitialized = ref(false);
     const gpvLayerInitialized = ref(false);
     const torrentialRainStatus = ref('无');
+
+    function tileLongitude(x: number, zoom: number) {
+      return (x / 2 ** zoom) * 360 - 180;
+    }
+
+    function tileLatitude(y: number, zoom: number) {
+      const radians = Math.atan(
+        Math.sinh(Math.PI * (1 - (2 * y) / 2 ** zoom))
+      );
+      return (radians * 180) / Math.PI;
+    }
+
+    function boundsFeature(
+      west: number,
+      south: number,
+      east: number,
+      north: number
+    ): Feature<Polygon> {
+      return {
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [
+            [
+              [west, south],
+              [east, south],
+              [east, north],
+              [west, north],
+              [west, south],
+            ],
+          ],
+        },
+        properties: {},
+      };
+    }
+
+    function radarCoverageMaskCollection(): FeatureCollection<Polygon> {
+      const west = tileLongitude(
+        Math.min(...RADAR_COVERAGE_TILES.map((tile) => tile.x)),
+        RADAR_COVERAGE_TILE_ZOOM
+      );
+      const east = tileLongitude(
+        Math.max(...RADAR_COVERAGE_TILES.map((tile) => tile.x)) + 1,
+        RADAR_COVERAGE_TILE_ZOOM
+      );
+      const north = tileLatitude(
+        Math.min(...RADAR_COVERAGE_TILES.map((tile) => tile.y)),
+        RADAR_COVERAGE_TILE_ZOOM
+      );
+      const south = tileLatitude(
+        Math.max(...RADAR_COVERAGE_TILES.map((tile) => tile.y)) + 1,
+        RADAR_COVERAGE_TILE_ZOOM
+      );
+
+      return {
+        type: 'FeatureCollection',
+        features: [
+          boundsFeature(-180, north, 180, WEB_MERCATOR_MAX_LATITUDE),
+          boundsFeature(-180, -WEB_MERCATOR_MAX_LATITUDE, 180, south),
+          boundsFeature(-180, south, west, north),
+          boundsFeature(east, south, 180, north),
+        ],
+      };
+    }
+
+    function radarCoverageMaskBeforeId() {
+      return map.value?.getLayer(RADAR_COVERAGE_MASK_LAYER_ID)
+        ? RADAR_COVERAGE_MASK_LAYER_ID
+        : undefined;
+    }
+
+    function ensureRadarCoverageMask() {
+      const currentMap = map.value;
+      if (!currentMap) return;
+      if (!currentMap.getSource(RADAR_COVERAGE_MASK_SOURCE_ID)) {
+        currentMap.addSource(RADAR_COVERAGE_MASK_SOURCE_ID, {
+          type: 'geojson',
+          data: radarCoverageMaskCollection(),
+        });
+      }
+      if (!currentMap.getLayer(RADAR_COVERAGE_MASK_LAYER_ID)) {
+        currentMap.addLayer({
+          id: RADAR_COVERAGE_MASK_LAYER_ID,
+          type: 'fill',
+          source: RADAR_COVERAGE_MASK_SOURCE_ID,
+          paint: {
+            'fill-color': '#000000',
+            'fill-opacity': 0.72,
+          },
+        });
+      }
+      currentMap.moveLayer(RADAR_COVERAGE_MASK_LAYER_ID);
+    }
 
     function registerFeatureHover(
       layerId: string,
@@ -271,17 +375,20 @@ export default defineComponent({
               type: 'geojson',
               data: dataCollection,
             });
-            map.value?.addLayer({
-              id: 'torrential-rain',
-              type: 'line',
-              source: 'torrential-rain',
-              // 'source-layer': 'sliced',
-              layout: {},
-              paint: {
-                'line-color': '#ff0000',
-                'line-width': 6,
+            map.value?.addLayer(
+              {
+                id: 'torrential-rain',
+                type: 'line',
+                source: 'torrential-rain',
+                // 'source-layer': 'sliced',
+                layout: {},
+                paint: {
+                  'line-color': '#ff0000',
+                  'line-width': 6,
+                },
               },
-            });
+              radarCoverageMaskBeforeId()
+            );
             torrentialRainLayerInitialized.value = true;
           } else {
             map.value?.setLayoutProperty(
@@ -314,23 +421,26 @@ export default defineComponent({
           tolerance: 0,
           data: `${sdk.cdnUrl}/analysis/rain/gpv_${precipitationStore.selectedDuration}_5km_${currentData.value?.time}.geojson`,
         });
-        map.value?.addLayer({
-          id: 'gpv',
-          type: 'symbol',
-          source: 'gpv',
-          minzoom: 9,
-          layout: {
-            'text-overlap': 'always',
-            'text-font': ['Roboto Bold'],
-            'text-field': ['get', 'value'],
+        map.value?.addLayer(
+          {
+            id: 'gpv',
+            type: 'symbol',
+            source: 'gpv',
+            minzoom: 9,
+            layout: {
+              'text-overlap': 'always',
+              'text-font': ['Roboto Bold'],
+              'text-field': ['get', 'value'],
+            },
+            paint: {
+              'text-color': '#FFF',
+              'text-halo-color': '#000',
+              'text-halo-width': 1,
+              'text-halo-blur': 1,
+            },
           },
-          paint: {
-            'text-color': '#FFF',
-            'text-halo-color': '#000',
-            'text-halo-width': 1,
-            'text-halo-blur': 1,
-          },
-        });
+          radarCoverageMaskBeforeId()
+        );
         gpvLayerInitialized.value = true;
       } else {
         map.value?.setLayoutProperty('gpv', 'visibility', 'visible');
@@ -558,54 +668,63 @@ export default defineComponent({
               data: dataCollectionSquare,
             });
             // Layer for displaying numbers
-            map.value?.addLayer({
-              id: 'rain-measurements-label',
-              type: 'symbol',
-              source: 'rain-measurements',
-              minzoom: 8,
-              layout: {
-                'symbol-sort-key': ['-', 0, ['to-number', ['get', 'value']]],
-                'text-allow-overlap': false,
-                'text-font': ['Roboto Bold'],
-                'text-size': 20,
-                'text-field': ['get', 'value'],
+            map.value?.addLayer(
+              {
+                id: 'rain-measurements-label',
+                type: 'symbol',
+                source: 'rain-measurements',
+                minzoom: 8,
+                layout: {
+                  'symbol-sort-key': ['-', 0, ['to-number', ['get', 'value']]],
+                  'text-allow-overlap': false,
+                  'text-font': ['Roboto Bold'],
+                  'text-size': 20,
+                  'text-field': ['get', 'value'],
+                },
+                paint: {
+                  'text-color': ['get', 'color'],
+                  'text-halo-color': '#707070',
+                  'text-halo-width': 1,
+                  'text-halo-blur': 1,
+                },
               },
-              paint: {
-                'text-color': ['get', 'color'],
-                'text-halo-color': '#707070',
-                'text-halo-width': 1,
-                'text-halo-blur': 1,
-              },
-            });
+              radarCoverageMaskBeforeId()
+            );
             // Layer for displaying 3d maps
-            map.value?.addLayer({
-              id: 'rain-measurements-3d',
-              type: 'fill-extrusion',
-              source: 'rain-measurements-square',
-              minzoom: 8,
-              paint: {
-                'fill-extrusion-color': ['get', 'color'],
-                'fill-extrusion-height': ['get', 'value'],
-                'fill-extrusion-base': 0,
-                'fill-extrusion-opacity': 0.85,
+            map.value?.addLayer(
+              {
+                id: 'rain-measurements-3d',
+                type: 'fill-extrusion',
+                source: 'rain-measurements-square',
+                minzoom: 8,
+                paint: {
+                  'fill-extrusion-color': ['get', 'color'],
+                  'fill-extrusion-height': ['get', 'value'],
+                  'fill-extrusion-base': 0,
+                  'fill-extrusion-opacity': 0.85,
+                },
               },
-            });
+              radarCoverageMaskBeforeId()
+            );
             // Layer for displaying points
-            map.value?.addLayer({
-              id: 'rain-measurements-point',
-              type: 'circle',
-              source: 'rain-measurements',
-              maxzoom: 8,
-              layout: {
-                'circle-sort-key': ['get', 'value'],
+            map.value?.addLayer(
+              {
+                id: 'rain-measurements-point',
+                type: 'circle',
+                source: 'rain-measurements',
+                maxzoom: 8,
+                layout: {
+                  'circle-sort-key': ['get', 'value'],
+                },
+                paint: {
+                  'circle-radius': 7,
+                  'circle-color': ['get', 'color'],
+                  'circle-stroke-width': 2,
+                  'circle-stroke-color': '#000',
+                },
               },
-              paint: {
-                'circle-radius': 7,
-                'circle-color': ['get', 'color'],
-                'circle-stroke-width': 2,
-                'circle-stroke-color': '#000',
-              },
-            });
+              radarCoverageMaskBeforeId()
+            );
             const measurementContent = (event: MapLayerMouseEvent) => ({
               title: String(
                 event.features?.[0]?.properties.name ?? '降雨观测站'
@@ -686,11 +805,13 @@ export default defineComponent({
           },
         });
         rainLayerInitialized.value = true;
+        ensureRadarCoverageMask();
       } else {
         (map.value?.getSource('rain') as GeoJSONSource | undefined)?.setData(
           getRainUrl()
         );
         // map.value?.getSource('rain').setTiles([`http://localhost:3000/tile/${currentData.value?.time}/{z}/{x}/{y}`])
+        ensureRadarCoverageMask();
       }
     }
 
@@ -711,10 +832,7 @@ export default defineComponent({
         return precipitationStore.isInPlayback;
       }),
       () => {
-        if (
-          !precipitationStore.isInPlayback &&
-          precipitationStore.initialized
-        ) {
+        if (precipitationStore.initialized) {
           refreshRainLayer();
         }
       }

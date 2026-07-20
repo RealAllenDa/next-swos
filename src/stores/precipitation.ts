@@ -12,7 +12,7 @@ export const usePrecipitationStore = defineStore('precipitation', {
     selectedResolution: '1km',
     selectedDuration: '1h',
 
-    optInThumbnailLoading: false,
+    optInThumbnailLoading: true,
 
     spec: undefined as Nullable<MapSpec>,
     list: undefined as Nullable<PrecipitationAnalysisList>,
