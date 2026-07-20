@@ -22,6 +22,21 @@
       />
     </q-toolbar>
 
+    <q-banner
+      v-if="showTorrentialRainBanner"
+      class="torrential-rain-banner"
+      dense
+    >
+      <template v-slot:avatar>
+        <q-icon
+          color="negative"
+          name="fa-solid fa-cloud-showers-heavy"
+          size="16px"
+        />
+      </template>
+      {{ torrentialRainWarningText }}
+    </q-banner>
+
     <div class="hazard-content row no-wrap">
       <div class="col hazard-map-column">
         <HazardMap
@@ -114,6 +129,10 @@ import {
   maximumRiverLevel,
 } from 'src/composables/hazard-utils';
 import { useGenericStore } from 'stores/generic';
+import {
+  TORRENTIAL_RAIN_BELT_WARNING_TEXT,
+  useLatestTorrentialRainBelt,
+} from 'src/composables/torrential-rain-belt';
 
 interface GroupItem {
   id: string;
@@ -151,6 +170,10 @@ export default defineComponent({
     const showHeader = computed(() => genericStore.showHeader);
 
     const isRain = computed(() => props.config.mode.startsWith('rain-'));
+    const torrentialRainBelt = useLatestTorrentialRainBelt(isRain);
+    const showTorrentialRainBanner = computed(
+      () => showHeader.value && isRain.value && torrentialRainBelt.exists.value
+    );
     const supportsIntensityStyle = computed(
       () => isRain.value || props.config.mode === 'wind'
     );
@@ -360,6 +383,8 @@ export default defineComponent({
       selectedStation,
       historyOpen,
       showHeader,
+      showTorrentialRainBanner,
+      torrentialRainWarningText: TORRENTIAL_RAIN_BELT_WARNING_TEXT,
       openStation,
       selectFeature,
     };
@@ -389,6 +414,24 @@ export default defineComponent({
 
 .hazard-toolbar--compact > * {
   display: none;
+}
+
+.torrential-rain-banner {
+  min-height: 34px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  color: #991b1b;
+  background: #fef2f2;
+  border-bottom: 1px solid #fecaca;
+  font-weight: 700;
+}
+
+.torrential-rain-banner :deep(.q-banner__avatar) {
+  display: flex;
+  min-width: 24px;
+  align-items: center;
+  align-self: center;
+  justify-content: center;
 }
 
 .hazard-content {

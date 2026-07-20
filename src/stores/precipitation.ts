@@ -2,6 +2,19 @@ import { defineStore } from 'pinia';
 import sdk from 'src/composables/sdk';
 import { format } from 'date-fns';
 
+function sortedPrecipitationData(data: PrecipitationAnalysisFile[]) {
+  return [...data].sort((a, b) => a.time - b.time);
+}
+
+function allPrecipitationData(list: PrecipitationAnalysisList) {
+  return sortedPrecipitationData(Object.values(list).flat());
+}
+
+function currentStepTime(step: number) {
+  const now = Math.floor(Date.now() / 1000);
+  return now - (now % step);
+}
+
 export const usePrecipitationStore = defineStore('precipitation', {
   state: () => ({
     initialized: false,
@@ -20,6 +33,7 @@ export const usePrecipitationStore = defineStore('precipitation', {
     currentData: undefined as Nullable<PrecipitationAnalysisFile>,
     dataChanged: false,
     isInPlayback: false,
+    radarLayerAvailable: false,
 
     displayTorrentialRain: false,
     torrentialRainAvailable: false,
@@ -138,15 +152,8 @@ export const usePrecipitationStore = defineStore('precipitation', {
         return;
       }
 
-      this.initLegends();
-      this.initResolution();
-      this.initTorrentialRain();
-      this.initGpv();
-      this.initRainMeasurements();
-
       const dataId = this.mapOptions[this.mapId].data_id;
-      let data: Nullable<Array<PrecipitationAnalysisFile>> =
-        this.list[dataId as keyof PrecipitationAnalysisList];
+      const data = this.list[dataId as keyof PrecipitationAnalysisList];
       if (data === undefined || data === null) {
         sdk.showNotification(
           'negative',
@@ -155,16 +162,30 @@ export const usePrecipitationStore = defineStore('precipitation', {
         return;
       }
 
-      data = [...data].sort((a, b) => a.time - b.time);
-      if (data.length === 0) {
+      const radarData = sortedPrecipitationData(data);
+      this.radarLayerAvailable = radarData.length > 0;
+      if (!this.radarLayerAvailable) {
         sdk.showNotification(
-          'negative',
-          `No precipitation data exists for ${dataId}`
+          'warning',
+          `No radar layer exists for ${dataId}. Only station observation data will be available.`
         );
-        return;
       }
-      this.startTime = data[0].time;
-      const endTime = data.at(-1);
+
+      this.initLegends();
+      this.initResolution();
+      this.initTorrentialRain();
+      this.initGpv();
+      this.initRainMeasurements();
+
+      let timelineData = this.radarLayerAvailable
+        ? radarData
+        : allPrecipitationData(this.list);
+      if (timelineData.length === 0) {
+        timelineData = [{time: currentStepTime(this.step)}];
+      }
+
+      this.startTime = timelineData[0].time;
+      const endTime = timelineData.at(-1);
       if (endTime === undefined || endTime === null) {
         sdk.showNotification('negative', "Shouldn't happen! endTime is null");
         return;
@@ -173,13 +194,16 @@ export const usePrecipitationStore = defineStore('precipitation', {
       }
 
       this.currentList = {};
-      data.forEach((content) => {
+      timelineData.forEach((content) => {
         this.currentList[content.time] = content;
       });
 
-      if (mutationType === 'initialize' || mutationType === 'refresh') {
-        // Init time
-        this.changeTime(this.endTime);
+      if (
+        mutationType === 'initialize' ||
+        mutationType === 'refresh' ||
+        this.currentList[this.currentTime] === undefined
+      ) {
+        this.currentTime = this.endTime;
       }
       this.setCurrentData();
     },
@@ -191,13 +215,15 @@ export const usePrecipitationStore = defineStore('precipitation', {
     },
     initTorrentialRain() {
       this.torrentialRainAvailable =
+        this.radarLayerAvailable &&
         this.mapOptions[this.mapId].torrential_avail;
       if (!this.torrentialRainAvailable) {
         this.displayTorrentialRain = false;
       }
     },
     initGpv() {
-      this.gpvAvailable = this.mapOptions[this.mapId].gpv_avail;
+      this.gpvAvailable =
+        this.radarLayerAvailable && this.mapOptions[this.mapId].gpv_avail;
       if (!this.gpvAvailable) {
         this.displayGpv = false;
       }

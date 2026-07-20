@@ -11,6 +11,30 @@
         </div>
       </div>
     </q-toolbar>
+    <q-banner
+      v-if="showTorrentialRainBanner"
+      class="precipitation-alert-banner torrential-rain-banner"
+      dense
+    >
+      <template v-slot:avatar>
+        <q-icon
+          color="negative"
+          name="fa-solid fa-cloud-showers-heavy"
+          size="16px"
+        />
+      </template>
+      {{ torrentialRainWarningText }}
+    </q-banner>
+    <q-banner
+      v-if="showRadarLayerBanner"
+      class="precipitation-alert-banner radar-layer-banner"
+      dense
+    >
+      <template v-slot:avatar>
+        <q-icon color="warning" name="layers_clear" size="16px"/>
+      </template>
+      {{ radarLayerWarningText }}
+    </q-banner>
     <MapSettings
       v-show="showToolbar"
       class="gt-sm"
@@ -36,6 +60,11 @@ import {useRoute} from 'vue-router';
 import PageLoading from 'components/PageLoading.vue';
 import {useGenericStore} from 'stores/generic';
 import PrecipFcstMapSettingsMobile from 'components/PrecipFcstMapSettingsMobile.vue';
+import {
+  TORRENTIAL_RAIN_BELT_WARNING_TEXT,
+  latestPrecipitationAnalysisTime,
+  useTorrentialRainBelt,
+} from 'src/composables/torrential-rain-belt';
 
 export default defineComponent({
   name: 'PrecipitationForecast',
@@ -61,6 +90,18 @@ export default defineComponent({
     const showHeader = computed(() => {
       return genericStore.showHeader;
     });
+    const torrentialRainBelt = useTorrentialRainBelt(
+      computed(() => latestPrecipitationAnalysisTime(precipitationStore.list))
+    );
+    const showTorrentialRainBanner = computed(
+      () => showHeader.value && torrentialRainBelt.exists.value
+    );
+    const showRadarLayerBanner = computed(
+      () =>
+        showHeader.value &&
+        precipitationStore.initialized &&
+        !precipitationStore.radarLayerAvailable
+    );
 
     let controller: AbortController | undefined;
 
@@ -146,6 +187,10 @@ export default defineComponent({
       showHeader,
       refreshPrecipitation,
       initialized,
+      showTorrentialRainBanner,
+      showRadarLayerBanner,
+      torrentialRainWarningText: TORRENTIAL_RAIN_BELT_WARNING_TEXT,
+      radarLayerWarningText: '所选时段无雷达图层，仅提供站点观测数据。',
     };
   },
 });
@@ -173,6 +218,33 @@ export default defineComponent({
 
 .precipitation-toolbar--compact > * {
   display: none;
+}
+
+.precipitation-alert-banner {
+  min-height: 34px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  font-weight: 700;
+}
+
+.precipitation-alert-banner :deep(.q-banner__avatar) {
+  display: flex;
+  min-width: 24px;
+  align-items: center;
+  align-self: center;
+  justify-content: center;
+}
+
+.torrential-rain-banner {
+  color: #991b1b;
+  background: #fef2f2;
+  border-bottom: 1px solid #fecaca;
+}
+
+.radar-layer-banner {
+  color: #854d0e;
+  background: #fffbeb;
+  border-bottom: 1px solid #fde68a;
 }
 
 @media (max-width: 600px) {

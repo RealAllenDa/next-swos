@@ -93,14 +93,14 @@
       stroke-width="9"
       transform="translate(85 85)"
     />
-    <text font-family="Verdana" font-size="36" x="180" y="70">猛烈</text>
-    <text font-family="Verdana" font-size="36" x="180" y="120">降水带</text>
+    <text font-family="Verdana" font-size="36" x="180" y="70">线状</text>
+    <text font-family="Verdana" font-size="36" x="180" y="120">降雨带</text>
   </svg>
 </template>
 
 <script>
-import { computed, defineComponent } from 'vue';
-import { usePrecipitationStore } from 'src/stores/precipitation';
+import {computed, defineComponent} from 'vue';
+import {usePrecipitationStore} from 'src/stores/precipitation';
 
 export default defineComponent({
   name: 'PrecipFcstLegend',

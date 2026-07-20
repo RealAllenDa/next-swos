@@ -104,6 +104,10 @@
               <span><q-icon name="water_drop"/> 降雨</span>
               <q-icon name="arrow_forward"/>
             </div>
+            <div v-if="torrentialRainBeltExists" class="rain-warning">
+              <q-icon name="fa-solid fa-cloud-showers-heavy"/>
+              <span>线状降雨带已生成</span>
+            </div>
             <div class="rain-comparison">
               <div
                 v-for="rain in rainSummary"
@@ -275,6 +279,7 @@ import {
 } from 'src/composables/hazard-utils';
 import {useGenericStore} from 'stores/generic';
 import {useQuasar} from 'quasar';
+import {useTorrentialRainBelt} from 'src/composables/torrential-rain-belt';
 
 interface DashboardStatusItem {
   label: string;
@@ -475,6 +480,12 @@ const radar = computed<DashboardPrecipitationRadar | null>(() => {
     }.geojson`,
   };
 });
+const torrentialRainBelt = useTorrentialRainBelt(
+  computed(() => radar.value?.time)
+);
+const torrentialRainBeltExists = computed(
+  () => torrentialRainBelt.exists.value
+);
 
 const dashboardData = computed<DashboardData>(() => ({
   geography: geography.value,
@@ -1396,6 +1407,21 @@ onBeforeUnmount(stopStatusCycle);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.rain-warning {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -1px 0 8px;
+  padding: 5px 8px;
+  border: 1px solid rgb(248 113 113 / 45%);
+  border-radius: 6px;
+  color: #991b1b;
+  background: rgb(254 226 226 / 88%);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
 .rain-period {

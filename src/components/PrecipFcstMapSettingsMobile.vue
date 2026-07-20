@@ -127,6 +127,16 @@
       </q-menu>
     </q-btn>
     <q-btn
+      :outline="!thumbnailLoading"
+      class="q-mr-sm"
+      color="primary"
+      icon="photo_size_select_small"
+      padding="sm"
+      @click="thumbnailLoading = !thumbnailLoading"
+    >
+      <q-tooltip>播放时使用5公里低分辨率图层</q-tooltip>
+    </q-btn>
+    <q-btn
       :disable="!torrentialRainAvailable"
       :outline="!displayTorrentialRain"
       class="q-mr-sm"
@@ -348,6 +358,14 @@ export default defineComponent({
       },
     });
     const playbackTimer: Ref<Nullable<number>> = ref();
+    const thumbnailLoading = computed({
+      get() {
+        return precipitationStore.optInThumbnailLoading;
+      },
+      set(value: boolean) {
+        precipitationStore.optInThumbnailLoading = value;
+      },
+    });
 
     function clearPlaybackTimer() {
       if (playbackTimer.value !== undefined && playbackTimer.value !== null) {
@@ -483,6 +501,7 @@ export default defineComponent({
       playbackSpeed,
       playbackSpeedList,
       isInPlayback,
+      thumbnailLoading,
       startPlayback,
       endPlayback,
 

@@ -40,7 +40,7 @@
           v-if="precipitationStore.displayTorrentialRain"
           class="legend-description-sub row"
         >
-          <span>猛烈降水带</span>
+          <span>线状降雨带</span>
           <span>{{ torrentialRainStatus }}</span>
         </div>
         <div
@@ -90,6 +90,7 @@ import {format} from 'date-fns';
 import {useQuasar} from 'quasar';
 import {applyBaseMapTheme, createBaseMapStyle} from 'src/maps/base-style';
 import {addUserLocationControl} from 'src/maps/user-location-control';
+import {TORRENTIAL_RAIN_BELT_NONE_LABEL, useTorrentialRainBelt,} from 'src/composables/torrential-rain-belt';
 
 const RADAR_COVERAGE_MASK_SOURCE_ID = 'radar-coverage-mask';
 const RADAR_COVERAGE_MASK_LAYER_ID = 'radar-coverage-mask';
@@ -131,6 +132,13 @@ export default defineComponent({
     const isLastTime = computed(
       () => precipitationStore.endTime === precipitationStore.currentTime
     );
+    const torrentialRainBelt = useTorrentialRainBelt(
+      computed(() =>
+        precipitationStore.radarLayerAvailable
+          ? currentData.value?.time
+          : undefined
+      )
+    );
 
     const showLegend = ref(false);
     const legendRain = ref<typeof MapControl>();
@@ -144,7 +152,11 @@ export default defineComponent({
     const torrentialRainLayerInitialized = ref(false);
     const rainMeasurementsLayerInitialized = ref(false);
     const gpvLayerInitialized = ref(false);
-    const torrentialRainStatus = ref('无');
+    const torrentialRainStatus = computed(() =>
+      torrentialRainBelt.exists.value
+        ? precipitationStore.currentTimeFormatted
+        : TORRENTIAL_RAIN_BELT_NONE_LABEL
+    );
 
     function tileLongitude(x: number, zoom: number) {
       return (x / 2 ** zoom) * 360 - 180;
@@ -236,7 +248,22 @@ export default defineComponent({
           },
         });
       }
+      currentMap.setLayoutProperty(
+        RADAR_COVERAGE_MASK_LAYER_ID,
+        'visibility',
+        'visible'
+      );
       currentMap.moveLayer(RADAR_COVERAGE_MASK_LAYER_ID);
+    }
+
+    function hideRadarCoverageMask() {
+      const currentMap = map.value;
+      if (!currentMap?.getLayer(RADAR_COVERAGE_MASK_LAYER_ID)) return;
+      currentMap.setLayoutProperty(
+        RADAR_COVERAGE_MASK_LAYER_ID,
+        'visibility',
+        'none'
+      );
     }
 
     function registerFeatureHover(
@@ -319,96 +346,50 @@ export default defineComponent({
     // }
 
     function refreshTorrentialRain() {
-      if (!torrentialRainDisplay.value) {
-        torrentialRainStatus.value = '无';
+      if (!map.value || !mapStyleReady.value) return;
+      if (
+        !torrentialRainDisplay.value ||
+        !precipitationStore.radarLayerAvailable
+      ) {
         if (torrentialRainLayerInitialized.value) {
           map.value?.setLayoutProperty('torrential-rain', 'visibility', 'none');
         }
         return;
       }
-      torrentialRainStatus.value = '无';
-      const {data: torrentialRainGeoJson} = sdk.useFetch<FeatureCollection>(
-        `${sdk.cdnUrl}/analysis/rain/tor_zone_3h_5km_${currentData.value?.time}.geojson`,
-        true
+      const dataCollection = torrentialRainBelt.collection.value;
+      if (!torrentialRainLayerInitialized.value) {
+        map.value?.addSource('torrential-rain', {
+          type: 'geojson',
+          data: dataCollection,
+        });
+        map.value?.addLayer(
+          {
+            id: 'torrential-rain',
+            type: 'line',
+            source: 'torrential-rain',
+            // 'source-layer': 'sliced',
+            layout: {},
+            paint: {
+              'line-color': '#ff0000',
+              'line-width': 6,
+            },
+          },
+          radarCoverageMaskBeforeId()
+        );
+        torrentialRainLayerInitialized.value = true;
+        return;
+      }
+      map.value?.setLayoutProperty(
+        'torrential-rain',
+        'visibility',
+        'visible'
       );
-      watch(
-        torrentialRainGeoJson,
-        () => {
-          if (
-            torrentialRainGeoJson.value === undefined ||
-            torrentialRainGeoJson.value === null
-          ) {
-            torrentialRainStatus.value = '无';
-            sdk.showNotification('negative', 'Failed to fetch torrential rain');
-            return;
-          }
-          // if (torrentialRainGeoJson.value.features.length === 0) {
-          //   return
-          // }
-
-          let dataCollection: FeatureCollection = {
-            type: 'FeatureCollection',
-            features: [],
-          };
-          torrentialRainGeoJson.value.features.forEach((feature) => {
-            const area = turf.convertArea(
-              turf.area(feature),
-              'meters',
-              'kilometers'
-            );
-            let areaQualified = true;
-            if (area < 500) {
-              areaQualified = false;
-            }
-
-            if (areaQualified) {
-              // const result = computeTorrentialRainEllipsis(feature);
-              dataCollection.features.push(feature);
-            }
-          });
-          torrentialRainStatus.value =
-            dataCollection.features.length > 0
-              ? precipitationStore.currentTimeFormatted
-              : '无';
-          if (!torrentialRainLayerInitialized.value) {
-            map.value?.addSource('torrential-rain', {
-              type: 'geojson',
-              data: dataCollection,
-            });
-            map.value?.addLayer(
-              {
-                id: 'torrential-rain',
-                type: 'line',
-                source: 'torrential-rain',
-                // 'source-layer': 'sliced',
-                layout: {},
-                paint: {
-                  'line-color': '#ff0000',
-                  'line-width': 6,
-                },
-              },
-              radarCoverageMaskBeforeId()
-            );
-            torrentialRainLayerInitialized.value = true;
-          } else {
-            map.value?.setLayoutProperty(
-              'torrential-rain',
-              'visibility',
-              'visible'
-            );
-            (
-              map.value?.getSource('torrential-rain') as
-                | GeoJSONSource
-                | undefined
-            )?.setData(dataCollection);
-          }
-        },
-        {once: true}
-      );
+      (map.value?.getSource('torrential-rain') as GeoJSONSource | undefined)
+        ?.setData(dataCollection);
     }
 
     function refreshGpv() {
-      if (!gpvDisplay.value) {
+      if (!gpvDisplay.value || !precipitationStore.radarLayerAvailable) {
         if (gpvLayerInitialized.value) {
           map.value?.setLayoutProperty('gpv', 'visibility', 'none');
         }
@@ -775,6 +756,15 @@ export default defineComponent({
       precipitationStore.mapIsLoading = true;
       if (rainLayerLoadingFallback) {
         window.clearTimeout(rainLayerLoadingFallback);
+        rainLayerLoadingFallback = undefined;
+      }
+      if (!precipitationStore.radarLayerAvailable) {
+        if (rainLayerInitialized.value) {
+          map.value?.setLayoutProperty('rain', 'visibility', 'none');
+        }
+        hideRadarCoverageMask();
+        finishRainLayerLoading(refreshToken);
+        return;
       }
       rainLayerLoadingFallback = window.setTimeout(() => {
         const currentMap = map.value;
@@ -807,6 +797,7 @@ export default defineComponent({
         rainLayerInitialized.value = true;
         ensureRadarCoverageMask();
       } else {
+        map.value?.setLayoutProperty('rain', 'visibility', 'visible');
         (map.value?.getSource('rain') as GeoJSONSource | undefined)?.setData(
           getRainUrl()
         );
@@ -861,11 +852,14 @@ export default defineComponent({
         () => precipitationStore.initialized,
         () => precipitationStore.selectedDuration,
         () => precipitationStore.selectedResolution,
+        () => precipitationStore.radarLayerAvailable,
+        () => precipitationStore.optInThumbnailLoading,
       ],
       refreshMapLayersForCurrentData
     );
 
     watch(torrentialRainDisplay, refreshTorrentialRain);
+    watch(() => torrentialRainBelt.collection.value, refreshTorrentialRain);
     watch(gpvDisplay, refreshGpv);
     watch(rainMeasurementsDisplay, refreshRainMeasurements);
     watch(
