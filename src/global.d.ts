@@ -28,7 +28,7 @@ declare type DashboardStatusTone =
 declare interface DashboardPrecipitationRadar {
   time: number;
   duration: '1h';
-  resolution: '5km';
+  resolution: '1km';
   dataUrl: string;
 }
 

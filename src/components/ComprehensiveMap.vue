@@ -25,7 +25,7 @@
             <div class="text-subtitle1 text-weight-medium">综合图层</div>
             <div class="text-caption text-grey-7">悬停要素可查看详情</div>
           </div>
-          <q-space />
+          <q-space/>
           <q-btn
             aria-label="定位上海"
             dense
@@ -57,16 +57,16 @@
           />
         </div>
       </q-card-section>
-      <q-separator />
+      <q-separator/>
       <q-list dense>
         <template v-for="group in layerGroups" :key="group.id">
           <q-item-label class="layer-category" header>
-            <q-icon :name="group.icon" />
+            <q-icon :name="group.icon"/>
             <span>{{ group.label }}</span>
           </q-item-label>
           <q-item v-for="layer in group.layers" :key="layer.id" tag="label">
             <q-item-section avatar>
-              <q-icon :color="layer.color" :name="layer.icon" />
+              <q-icon :color="layer.color" :name="layer.icon"/>
             </q-item-section>
             <q-item-section>
               <q-item-label>{{ layer.name }}</q-item-label>
@@ -83,22 +83,13 @@
           </q-item>
         </template>
       </q-list>
-      <q-separator />
+      <q-separator/>
     </q-card>
   </div>
 </template>
 
 <script lang="ts" setup>
-import {
-  computed,
-  markRaw,
-  onBeforeUnmount,
-  onMounted,
-  reactive,
-  ref,
-  shallowRef,
-  watch,
-} from 'vue';
+import {computed, markRaw, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch,} from 'vue';
 import {
   type ExpressionSpecification,
   FullscreenControl,
@@ -112,10 +103,10 @@ import {
   ScaleControl,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { Feature, FeatureCollection, LineString, Point } from 'geojson';
-import { useQuasar } from 'quasar';
-import { applyBaseMapTheme, createBaseMapStyle } from 'src/maps/base-style';
-import { addUserLocationControl } from 'src/maps/user-location-control';
+import type {Feature, FeatureCollection, LineString, Point} from 'geojson';
+import {useQuasar} from 'quasar';
+import {applyBaseMapTheme, createBaseMapStyle} from 'src/maps/base-style';
+import {addUserLocationControl} from 'src/maps/user-location-control';
 import {
   emptyFeatureCollection,
   EXTREME_RAIN_BORDER_COLOR,
@@ -136,7 +127,7 @@ const props = withDefaults(
     layerPanelOpen?: boolean;
     layerControlsHidden?: boolean;
   }>(),
-  { layerPanelOpen: undefined, layerControlsHidden: false }
+  {layerPanelOpen: undefined, layerControlsHidden: false}
 );
 const emit = defineEmits<{
   (event: 'update:layerPanelOpen', value: boolean): void;
@@ -285,7 +276,7 @@ function windCollections(): {
         const endLongitude =
           item.longitude +
           (Math.sin(radians) * distanceKm) /
-            (111 * Math.cos((item.latitude * Math.PI) / 180));
+          (111 * Math.cos((item.latitude * Math.PI) / 180));
         lines.features.push({
           type: 'Feature',
           geometry: {
@@ -295,12 +286,12 @@ function windCollections(): {
               [endLongitude, endLatitude],
             ],
           },
-          properties: { level: item.level },
+          properties: {level: item.level},
         });
       });
     }
   );
-  return { points, lines };
+  return {points, lines};
 }
 
 function inundationCollection(): FeatureCollection<Point> {
@@ -381,8 +372,8 @@ function typhoonCollections(): {
     if (coordinates.length > 1) {
       lines.features.push({
         type: 'Feature',
-        geometry: { type: 'LineString', coordinates },
-        properties: { id, forecast: false, color: '#fff' },
+        geometry: {type: 'LineString', coordinates},
+        properties: {id, forecast: false, color: '#fff'},
       });
     }
     const current = detail.points.at(-1);
@@ -420,11 +411,11 @@ function typhoonCollections(): {
             ...forecastCoordinates,
           ],
         },
-        properties: { id, forecast: true, color: forecastColor(forecast.sets) },
+        properties: {id, forecast: true, color: forecastColor(forecast.sets)},
       });
     });
   });
-  return { points, lines };
+  return {points, lines};
 }
 
 function strengthColor(strength: string): string {
@@ -749,9 +740,9 @@ const layerOptions = computed(() => {
       available: Boolean(latestRadar.value),
       countLabel: latestRadar.value
         ? new Date(latestRadar.value.time * 1000).toLocaleTimeString('zh-CN', {
-            hour: '2-digit',
-            minute: '2-digit',
-          })
+          hour: '2-digit',
+          minute: '2-digit',
+        })
         : '暂无数据',
     },
     {
@@ -913,7 +904,7 @@ function refreshRadar() {
       id: 'dashboard-radar',
       type: 'fill',
       source: 'dashboard-radar',
-      layout: { visibility: visibleLayers.radar ? 'visible' : 'none' },
+      layout: {visibility: visibleLayers.radar ? 'visible' : 'none'},
       paint: {
         'fill-color': ['to-color', ['get', 'c']],
         'fill-opacity': 0.46,
@@ -943,7 +934,7 @@ function addSourcesAndLayers() {
     'dashboard-typhoon-lines': typhoons.lines,
   };
   Object.entries(sources).forEach(([id, data]) =>
-    currentMap.addSource(id, { type: 'geojson', data })
+    currentMap.addSource(id, {type: 'geojson', data})
   );
 
   const levelColor: ExpressionSpecification = [
@@ -988,7 +979,7 @@ function addSourcesAndLayers() {
     id: 'dashboard-area-outline',
     type: 'line',
     source: 'dashboard-areas',
-    paint: { 'line-color': '#64748b', 'line-width': 0.8, 'line-opacity': 0.55 },
+    paint: {'line-color': '#64748b', 'line-width': 0.8, 'line-opacity': 0.55},
   });
   currentMap.addLayer({
     id: 'dashboard-flood-boundary',
@@ -1035,8 +1026,8 @@ function addSourcesAndLayers() {
     id: 'dashboard-wind-lines',
     type: 'line',
     source: 'dashboard-wind-lines',
-    layout: { visibility: visibleLayers.wind ? 'visible' : 'none' },
-    paint: { 'line-color': levelColor, 'line-width': 2.5 },
+    layout: {visibility: visibleLayers.wind ? 'visible' : 'none'},
+    paint: {'line-color': levelColor, 'line-width': 2.5},
   });
 
   addRainSymbolLayer(
@@ -1073,7 +1064,7 @@ function addSourcesAndLayers() {
     'dashboard-inundation',
     'dashboard-icon-inundation',
     visibleLayers.inundation,
-    { textColor: levelColor }
+    {textColor: levelColor}
   );
   addIconSymbolLayer(
     currentMap,
@@ -1081,7 +1072,7 @@ function addSourcesAndLayers() {
     'dashboard-stations',
     'dashboard-icon-station',
     visibleLayers.stations,
-    { textColor: levelColor }
+    {textColor: levelColor}
   );
   addIconSymbolLayer(
     currentMap,
@@ -1089,7 +1080,7 @@ function addSourcesAndLayers() {
     'dashboard-typhoon-points',
     'dashboard-icon-typhoon',
     visibleLayers.typhoons,
-    { textColor: ['get', 'color'], textSize: 11 }
+    {textColor: ['get', 'color'], textSize: 11}
   );
 
   refreshRadar();
@@ -1268,7 +1259,7 @@ function showCombinedPopup(
       const properties = feature.properties;
       const category = String(
         properties.category ??
-          (feature.layer.id === 'dashboard-rivers' ? '河流' : '监测')
+        (feature.layer.id === 'dashboard-rivers' ? '河流' : '监测')
       );
       const name = String(properties.name ?? '未命名要素');
       const detail = [properties.area, properties.detail]
@@ -1319,7 +1310,7 @@ function applyLayerVisibility() {
 }
 
 function focusShanghai() {
-  map.value?.flyTo({ center: [121.51, 31.26], zoom: 8.7, duration: 800 });
+  map.value?.flyTo({center: [121.51, 31.26], zoom: 8.7, duration: 800});
 }
 
 function focusTyphoons() {
@@ -1328,12 +1319,12 @@ function focusTyphoons() {
     (result, coordinate) => result.extend(coordinate),
     new LngLatBounds(typhoonCoordinates.value[0], typhoonCoordinates.value[0])
   );
-  map.value.fitBounds(bounds, { padding: 80, maxZoom: 7, duration: 800 });
+  map.value.fitBounds(bounds, {padding: 80, maxZoom: 7, duration: 800});
 }
 
 watch(() => props.data, refreshGeoJsonSources);
 watch(() => props.data.radar, refreshRadar);
-watch(visibleLayers, applyLayerVisibility, { deep: true });
+watch(visibleLayers, applyLayerVisibility, {deep: true});
 watch(
   () => $q.dark.isActive,
   (dark) => applyBaseMapTheme(map.value, dark)
@@ -1355,7 +1346,7 @@ onMounted(() => {
   map.value.addControl(new NavigationControl(), 'bottom-left');
   addUserLocationControl(map.value, 'bottom-left');
   map.value.addControl(new FullscreenControl(), 'bottom-left');
-  map.value.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-right');
+  map.value.addControl(new ScaleControl({unit: 'metric'}), 'bottom-right');
   map.value.once('load', addSourcesAndLayers);
   resizeObserver = new ResizeObserver(() => map.value?.resize());
   resizeObserver.observe(mapContainer.value);

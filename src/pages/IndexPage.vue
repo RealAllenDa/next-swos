@@ -129,8 +129,8 @@
           </router-link>
 
           <router-link
-            class="map-insight metric-insight wind-insight"
             :style="windIntensityPanelStyle"
+            class="map-insight metric-insight wind-insight"
             to="/wind"
           >
             <div class="metric-icon wind-compass">
@@ -469,8 +469,8 @@ const radar = computed<DashboardPrecipitationRadar | null>(() => {
   return {
     time: latest.time,
     duration: '1h',
-    resolution: '5km',
-    dataUrl: `${sdk.cdnUrl.replace(/\/$/, '')}/analysis/rain/rain_1h_5km_${
+    resolution: '1km',
+    dataUrl: `${sdk.cdnUrl.replace(/\/$/, '')}/analysis/rain/rain_1h_1km_${
       latest.time
     }.geojson`,
   };
@@ -1361,11 +1361,11 @@ onBeforeUnmount(stopStatusCycle);
   border: 1px solid var(--insight-border, var(--swos-border));
   border-radius: 8px;
   background: linear-gradient(
-      135deg,
-      var(--insight-bg, transparent),
-      transparent 62%
-    ),
-    var(--swos-map-card);
+    135deg,
+    var(--insight-bg, transparent),
+    transparent 62%
+  ),
+  var(--swos-map-card);
   box-shadow: 0 12px 32px rgb(15 23 42 / 18%);
   backdrop-filter: blur(16px);
   text-decoration: none;
